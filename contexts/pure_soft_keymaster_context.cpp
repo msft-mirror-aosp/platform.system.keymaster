@@ -184,9 +184,8 @@ keymaster_error_t PureSoftKeymasterContext::CreateKeyBlob(const AuthorizationSet
         }
     }
 
-    keymaster_error_t error =
-        SetKeyBlobAuthorizations(key_description, origin, os_version_, os_patchlevel_, hw_enforced,
-                                 sw_enforced, GetKmVersion());
+    keymaster_error_t error = SetKeyBlobAuthorizations(key_description, origin, os_version_,
+                                                       os_patchlevel_, hw_enforced, sw_enforced);
     if (error != KM_ERROR_OK) return error;
     error =
         ExtendKeyBlobAuthorizations(hw_enforced, sw_enforced, vendor_patchlevel_, boot_patchlevel_);
@@ -385,22 +384,6 @@ CertificateChain PureSoftKeymasterContext::GenerateSelfSignedCertificate(
     const AsymmetricKey& asymmetric_key = static_cast<const AsymmetricKey&>(key);
 
     return generate_self_signed_cert(asymmetric_key, cert_params, fake_signature, error);
-}
-
-keymaster::Buffer PureSoftKeymasterContext::GenerateUniqueId(uint64_t creation_date_time,
-                                                             const keymaster_blob_t& application_id,
-                                                             bool reset_since_rotation,
-                                                             keymaster_error_t* error) const {
-    *error = KM_ERROR_OK;
-    // The default implementation fakes the hardware bound key with an arbitrary 128-bit value.
-    // Any real implementation must follow the guidance from the interface definition
-    // hardware/interfaces/security/keymint/aidl/android/hardware/security/keymint/Tag.aidl:
-    // "..a unique hardware-bound secret known to the secure environment and never revealed by it.
-    // The secret must contain at least 128 bits of entropy and be unique to the individual device"
-    const std::vector<uint8_t> fake_hbk = {'M', 'u', 's', 't', 'B', 'e', 'R', 'a',
-                                           'n', 'd', 'o', 'm', 'B', 'i', 't', 's'};
-    return keymaster::generate_unique_id(fake_hbk, creation_date_time, application_id,
-                                         reset_since_rotation);
 }
 
 static keymaster_error_t TranslateAuthorizationSetError(AuthorizationSet::Error err) {
