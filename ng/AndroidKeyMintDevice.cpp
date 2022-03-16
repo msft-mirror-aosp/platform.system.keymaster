@@ -225,6 +225,14 @@ AndroidKeyMintDevice::AndroidKeyMintDevice(SecurityLevel securityLevel)
               // The OS patch level only has a year and a month so we just add the 1st
               // of the month as day field.
               context->SetBootPatchlevel(GetOsPatchlevel() * 100 + 1);
+              auto digest = ::keymaster::GetVbmetaDigest();
+              if (digest) {
+                  std::string bootState = ::keymaster::GetVerifiedBootState();
+                  std::string bootloaderState = ::keymaster::GetBootloaderState();
+                  context->SetVerifiedBootInfo(bootState, bootloaderState, *digest);
+              } else {
+                  LOG(ERROR) << "Unable to read vb_meta digest";
+              }
               return context;
           }(),
           kOperationTableSize)),
@@ -484,8 +492,8 @@ ScopedAStatus AndroidKeyMintDevice::sendRootOfTrust(const vector<uint8_t>& /* ro
     return kmError2ScopedAStatus(KM_ERROR_UNIMPLEMENTED);
 }
 
-IKeyMintDevice* CreateKeyMintDevice(SecurityLevel securityLevel) {
-    return ::new AndroidKeyMintDevice(securityLevel);
+std::shared_ptr<IKeyMintDevice> CreateKeyMintDevice(SecurityLevel securityLevel) {
+    return ndk::SharedRefBase::make<AndroidKeyMintDevice>(securityLevel);
 }
 
 }  // namespace aidl::android::hardware::security::keymint
