@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-#pragma once
+#ifndef SYSTEM_KEYMASTER_SYMMETRIC_KEY_H_
+#define SYSTEM_KEYMASTER_SYMMETRIC_KEY_H_
 
 #include <keymaster/key_factory.h>
 #include <keymaster/random_source.h>
@@ -28,26 +29,19 @@ class SymmetricKey;
 
 class SymmetricKeyFactory : public KeyFactory, public SoftKeyFactoryMixin {
   public:
-    explicit SymmetricKeyFactory(const SoftwareKeyBlobMaker& blob_maker,
-                                 const RandomSource& random_source)
-        : SoftKeyFactoryMixin(blob_maker), random_source_(random_source) {}
+    explicit SymmetricKeyFactory(const SoftwareKeyBlobMaker* blob_maker,
+                                 const RandomSource* random_source) :
+            SoftKeyFactoryMixin(blob_maker),
+            random_source_(*random_source) {}
 
     keymaster_error_t GenerateKey(const AuthorizationSet& key_description,
-                                  UniquePtr<Key> attest_key,
-                                  const KeymasterBlob& issuer_subject,  //
-                                  KeymasterKeyBlob* key_blob,
-                                  AuthorizationSet* hw_enforced,  //
-                                  AuthorizationSet* sw_enforced,
-                                  CertificateChain* cert_chain) const override;
+                                  KeymasterKeyBlob* key_blob, AuthorizationSet* hw_enforced,
+                                  AuthorizationSet* sw_enforced) const override;
     keymaster_error_t ImportKey(const AuthorizationSet& key_description,
                                 keymaster_key_format_t input_key_material_format,
                                 const KeymasterKeyBlob& input_key_material,
-                                UniquePtr<Key> attest_key,
-                                const KeymasterBlob& issuer_subject,  //
-                                KeymasterKeyBlob* output_key_blob,
-                                AuthorizationSet* hw_enforced,  //
-                                AuthorizationSet* sw_enforced,
-                                CertificateChain* cert_chain) const override;
+                                KeymasterKeyBlob* output_key_blob, AuthorizationSet* hw_enforced,
+                                AuthorizationSet* sw_enforced) const override;
 
     virtual const keymaster_key_format_t* SupportedImportFormats(size_t* count) const override;
     virtual const keymaster_key_format_t* SupportedExportFormats(size_t* count) const override {
@@ -83,7 +77,10 @@ class SymmetricKey : public Key {
 
   protected:
     SymmetricKey(KeymasterKeyBlob&& key_material, AuthorizationSet&& hw_enforced,
-                 AuthorizationSet&& sw_enforced, const KeyFactory* key_factory);
+                 AuthorizationSet&& sw_enforced,
+                 const KeyFactory* key_factory);
 };
 
 }  // namespace keymaster
+
+#endif  // SYSTEM_KEYMASTER_AES_KEY_H_

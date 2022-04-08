@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-#pragma once
+#ifndef SYSTEM_KEYMASTER_KEY_FACTORY_H_
+#define SYSTEM_KEYMASTER_KEY_FACTORY_H_
 
 #include <hardware/keymaster_defs.h>
 #include <keymaster/authorization_set.h>
@@ -24,7 +25,7 @@ namespace keymaster {
 class Key;
 class KeymasterContext;
 class OperationFactory;
-template <typename BlobType> struct TKeymasterBlob;
+template<typename BlobType> struct TKeymasterBlob;
 typedef TKeymasterBlob<keymaster_key_blob_t> KeymasterKeyBlob;
 
 /**
@@ -37,22 +38,15 @@ class KeyFactory {
 
     // Factory methods.
     virtual keymaster_error_t GenerateKey(const AuthorizationSet& key_description,
-                                          UniquePtr<Key> attestation_signing_key,
-                                          const KeymasterBlob& issuer_subject,
-                                          KeymasterKeyBlob* key_blob,  //
-                                          AuthorizationSet* hw_enforced,
-                                          AuthorizationSet* sw_enforced,
-                                          CertificateChain* cert_chain) const = 0;
+                                          KeymasterKeyBlob* key_blob, AuthorizationSet* hw_enforced,
+                                          AuthorizationSet* sw_enforced) const = 0;
 
-    virtual keymaster_error_t ImportKey(const AuthorizationSet& key_description,  //
+    virtual keymaster_error_t ImportKey(const AuthorizationSet& key_description,
                                         keymaster_key_format_t input_key_material_format,
                                         const KeymasterKeyBlob& input_key_material,
-                                        UniquePtr<Key> attestation_signing_key,  //
-                                        const KeymasterBlob& issuer_subject,
                                         KeymasterKeyBlob* output_key_blob,
                                         AuthorizationSet* hw_enforced,
-                                        AuthorizationSet* sw_enforced,
-                                        CertificateChain* cert_chain) const = 0;
+                                        AuthorizationSet* sw_enforced) const = 0;
 
     virtual keymaster_error_t LoadKey(KeymasterKeyBlob&& key_material,
                                       const AuthorizationSet& additional_params,
@@ -68,3 +62,5 @@ class KeyFactory {
 };
 
 }  // namespace keymaster
+
+#endif  // SYSTEM_KEYMASTER_KEY_FACTORY_H_

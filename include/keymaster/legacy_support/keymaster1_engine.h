@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-#pragma once
+#ifndef SYSTEM_KEYMASTER_KEYMASTER1_ENGINE_H_
+#define SYSTEM_KEYMASTER_KEYMASTER1_ENGINE_H_
 
 #include <memory>
 
@@ -29,6 +30,7 @@
 #include <keymaster/android_keymaster_utils.h>
 #include <keymaster/authorization_set.h>
 #include <keymaster/km_openssl/openssl_utils.h>
+
 
 namespace keymaster {
 
@@ -94,9 +96,7 @@ class Keymaster1Engine {
                                        keymaster_blob_t* output);
 
     static int duplicate_key_data(CRYPTO_EX_DATA* to, const CRYPTO_EX_DATA* from, void** from_d,
-                                  // NOLINTNEXTLINE(google-runtime-int)
                                   int index, long argl, void* argp);
-    // NOLINTNEXTLINE(google-runtime-int)
     static void free_key_data(void* parent, void* ptr, CRYPTO_EX_DATA* data, int index, long argl,
                               void* argp);
 
@@ -119,3 +119,5 @@ class Keymaster1Engine {
 };
 
 }  // namespace keymaster
+
+#endif  // SYSTEM_KEYMASTER_KEYMASTER1_ENGINE_H_

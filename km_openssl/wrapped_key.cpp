@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <keymaster/attestation_record.h>
 #include <keymaster/logger.h>
 #include <keymaster/wrapped_key.h>
 

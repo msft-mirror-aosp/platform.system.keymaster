@@ -24,10 +24,9 @@
 
 namespace keymaster {
 
-RsaKeymaster1KeyFactory::RsaKeymaster1KeyFactory(const SoftwareKeyBlobMaker& blob_maker,
-                                                 const KeymasterContext& context,
+RsaKeymaster1KeyFactory::RsaKeymaster1KeyFactory(const SoftwareKeyBlobMaker* blob_maker,
                                                  const Keymaster1Engine* engine)
-    : RsaKeyFactory(blob_maker, context), engine_(engine),
+    : RsaKeyFactory(blob_maker), engine_(engine),
       sign_factory_(new RsaKeymaster1OperationFactory(KM_PURPOSE_SIGN, engine)),
       decrypt_factory_(new RsaKeymaster1OperationFactory(KM_PURPOSE_DECRYPT, engine)),
       // For pubkey ops we can use the normal operation factories.
@@ -81,27 +80,18 @@ static void UpdateToWorkAroundUnsupportedDigests(const AuthorizationSet& key_des
 }
 
 keymaster_error_t RsaKeymaster1KeyFactory::GenerateKey(const AuthorizationSet& key_description,
-                                                       UniquePtr<Key> /* attest_key */,
-                                                       const KeymasterBlob& /* issuer_subject */,
                                                        KeymasterKeyBlob* key_blob,
                                                        AuthorizationSet* hw_enforced,
-                                                       AuthorizationSet* sw_enforced,
-                                                       CertificateChain* /* cert_chain */) const {
+                                                       AuthorizationSet* sw_enforced) const {
     AuthorizationSet key_params_copy;
     UpdateToWorkAroundUnsupportedDigests(key_description, &key_params_copy);
     return engine_->GenerateKey(key_params_copy, key_blob, hw_enforced, sw_enforced);
 }
 
-keymaster_error_t  //
-RsaKeymaster1KeyFactory::ImportKey(const AuthorizationSet& key_description,
-                                   keymaster_key_format_t input_key_material_format,
-                                   const KeymasterKeyBlob& input_key_material,
-                                   UniquePtr<Key> /* attest_key */,
-                                   const KeymasterBlob& /* issuer_subject */,
-                                   KeymasterKeyBlob* output_key_blob,  //
-                                   AuthorizationSet* hw_enforced,      //
-                                   AuthorizationSet* sw_enforced,
-                                   CertificateChain* /* cert_chain */) const {
+keymaster_error_t RsaKeymaster1KeyFactory::ImportKey(
+    const AuthorizationSet& key_description, keymaster_key_format_t input_key_material_format,
+    const KeymasterKeyBlob& input_key_material, KeymasterKeyBlob* output_key_blob,
+    AuthorizationSet* hw_enforced, AuthorizationSet* sw_enforced) const {
     AuthorizationSet key_params_copy;
     UpdateToWorkAroundUnsupportedDigests(key_description, &key_params_copy);
     return engine_->ImportKey(key_params_copy, input_key_material_format, input_key_material,
@@ -113,15 +103,18 @@ keymaster_error_t RsaKeymaster1KeyFactory::LoadKey(KeymasterKeyBlob&& key_materi
                                                    AuthorizationSet&& hw_enforced,
                                                    AuthorizationSet&& sw_enforced,
                                                    UniquePtr<Key>* key) const {
-    if (!key) return KM_ERROR_OUTPUT_PARAMETER_NULL;
+    if (!key)
+        return KM_ERROR_OUTPUT_PARAMETER_NULL;
 
     keymaster_error_t error;
     RSA_Ptr rsa(engine_->BuildRsaKey(key_material, additional_params, &error));
-    if (!rsa.get()) return error;
+    if (!rsa.get())
+        return error;
 
     key->reset(new (std::nothrow)
                    RsaKeymaster1Key(rsa.release(), move(hw_enforced), move(sw_enforced), this));
-    if (!(*key)) return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+    if (!(*key))
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
 
     (*key)->key_material() = move(key_material);
     return KM_ERROR_OK;
@@ -139,8 +132,6 @@ OperationFactory* RsaKeymaster1KeyFactory::GetOperationFactory(keymaster_purpose
         return decrypt_factory_.get();
     case KM_PURPOSE_DERIVE_KEY:
     case KM_PURPOSE_WRAP:
-    case KM_PURPOSE_AGREE_KEY:
-    case KM_PURPOSE_ATTEST_KEY:
         break;
     }
     return nullptr;

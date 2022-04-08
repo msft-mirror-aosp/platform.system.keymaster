@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-#pragma once
+#ifndef SYSTEM_KEYMASTER_EC_KEY_H_
+#define SYSTEM_KEYMASTER_EC_KEY_H_
 
 #include <openssl/ec.h>
 
@@ -27,11 +28,10 @@ class EcdsaOperationFactory;
 
 class EcKey : public AsymmetricKey {
   public:
-    EcKey(AuthorizationSet hw_enforced, AuthorizationSet sw_enforced, const KeyFactory* factory)
-        : AsymmetricKey(move(hw_enforced), move(sw_enforced), factory) {}
-    EcKey(AuthorizationSet hw_enforced, AuthorizationSet sw_enforced, const KeyFactory* factory,
-          EC_KEY_Ptr ec_key)
-        : AsymmetricKey(move(hw_enforced), move(sw_enforced), factory), ec_key_(move(ec_key)) {}
+    EcKey(AuthorizationSet&& hw_enforced, AuthorizationSet&& sw_enforced,
+          const KeyFactory* key_factory)
+        : AsymmetricKey(move(hw_enforced), move(sw_enforced), key_factory) {}
+    virtual ~EcKey() {}
 
     bool InternalToEvp(EVP_PKEY* pkey) const override;
     bool EvpToInternal(const EVP_PKEY* pkey) override;
@@ -39,7 +39,7 @@ class EcKey : public AsymmetricKey {
     EC_KEY* key() const { return ec_key_.get(); }
 
   protected:
-    EcKey(EC_KEY* ec_key, AuthorizationSet hw_enforced, AuthorizationSet sw_enforced,
+    EcKey(EC_KEY* ec_key, AuthorizationSet&& hw_enforced, AuthorizationSet&& sw_enforced,
           const KeyFactory* key_factory)
         : AsymmetricKey(move(hw_enforced), move(sw_enforced), key_factory), ec_key_(ec_key) {}
 
@@ -48,3 +48,5 @@ class EcKey : public AsymmetricKey {
 };
 
 }  // namespace keymaster
+
+#endif  // SYSTEM_KEYMASTER_EC_KEY_H_

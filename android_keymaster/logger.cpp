@@ -21,14 +21,13 @@ namespace keymaster {
 Logger* Logger::instance_ = nullptr;
 
 /* static */
-// NOLINTNEXTLINE(cert-dcl50-cpp)
 int Logger::Log(LogLevel level, const char* fmt, va_list args) {
-    if (!instance_) return 0;
+    if (!instance_)
+        return 0;
     return instance_->log_msg(level, fmt, args);
 }
 
 /* static */
-// NOLINTNEXTLINE(cert-dcl50-cpp)
 int Logger::Log(LogLevel level, const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
@@ -38,7 +37,6 @@ int Logger::Log(LogLevel level, const char* fmt, ...) {
 }
 
 /* static */
-// NOLINTNEXTLINE(cert-dcl50-cpp)
 int Logger::Debug(const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
@@ -48,7 +46,6 @@ int Logger::Debug(const char* fmt, ...) {
 }
 
 /* static */
-// NOLINTNEXTLINE(cert-dcl50-cpp)
 int Logger::Info(const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
@@ -56,9 +53,7 @@ int Logger::Info(const char* fmt, ...) {
     va_end(args);
     return result;
 }
-
 /* static */
-// NOLINTNEXTLINE(cert-dcl50-cpp)
 int Logger::Warning(const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
@@ -66,9 +61,7 @@ int Logger::Warning(const char* fmt, ...) {
     va_end(args);
     return result;
 }
-
 /* static */
-// NOLINTNEXTLINE(cert-dcl50-cpp)
 int Logger::Error(const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
@@ -76,9 +69,7 @@ int Logger::Error(const char* fmt, ...) {
     va_end(args);
     return result;
 }
-
 /* static */
-// NOLINTNEXTLINE(cert-dcl50-cpp)
 int Logger::Severe(const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
@@ -86,5 +77,6 @@ int Logger::Severe(const char* fmt, ...) {
     va_end(args);
     return result;
 }
+
 
 }  // namespace keymaster

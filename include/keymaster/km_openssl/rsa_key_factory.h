@@ -14,39 +14,34 @@
  * limitations under the License.
  */
 
-#pragma once
+#ifndef SYSTEM_KEYMASTER_RSA_KEY_FACTORY_H_
+#define SYSTEM_KEYMASTER_RSA_KEY_FACTORY_H_
 
 #include <openssl/evp.h>
 #include <openssl/rsa.h>
 
 #include <keymaster/asymmetric_key_factory.h>
 #include <keymaster/soft_key_factory.h>
+#include <keymaster/attestation_record.h>
 
 namespace keymaster {
 
 class RsaKeyFactory : public AsymmetricKeyFactory, public SoftKeyFactoryMixin {
   public:
-    explicit RsaKeyFactory(const SoftwareKeyBlobMaker& blob_maker, const KeymasterContext& context)
-        : AsymmetricKeyFactory(context), SoftKeyFactoryMixin(blob_maker) {}
+    explicit RsaKeyFactory(const SoftwareKeyBlobMaker* blob_maker) :
+            SoftKeyFactoryMixin(blob_maker) {}
 
     keymaster_error_t GenerateKey(const AuthorizationSet& key_description,
-                                  UniquePtr<Key> attest_key,
-                                  const KeymasterBlob& issuer_subject,  //
-                                  KeymasterKeyBlob* key_blob,
-                                  AuthorizationSet* hw_enforced,  //
-                                  AuthorizationSet* sw_enforced,
-                                  CertificateChain* cert_chain) const override;
+                                  KeymasterKeyBlob* key_blob, AuthorizationSet* hw_enforced,
+                                  AuthorizationSet* sw_enforced) const override;
     keymaster_error_t ImportKey(const AuthorizationSet& key_description,
                                 keymaster_key_format_t input_key_material_format,
                                 const KeymasterKeyBlob& input_key_material,
-                                UniquePtr<Key> attest_key,  //
-                                const KeymasterBlob& issuer_subject,
-                                KeymasterKeyBlob* output_key_blob,
-                                AuthorizationSet* hw_enforced,  //
-                                AuthorizationSet* sw_enforced,
-                                CertificateChain* cert_chain) const override;
+                                KeymasterKeyBlob* output_key_blob, AuthorizationSet* hw_enforced,
+                                AuthorizationSet* sw_enforced) const override;
 
-    keymaster_error_t CreateEmptyKey(AuthorizationSet&& hw_enforced, AuthorizationSet&& sw_enforced,
+    keymaster_error_t CreateEmptyKey(AuthorizationSet&& hw_enforced,
+                                     AuthorizationSet&& sw_enforced,
                                      UniquePtr<AsymmetricKey>* key) const override;
 
     OperationFactory* GetOperationFactory(keymaster_purpose_t purpose) const override;
@@ -64,3 +59,5 @@ class RsaKeyFactory : public AsymmetricKeyFactory, public SoftKeyFactoryMixin {
 };
 
 }  // namespace keymaster
+
+#endif  // SYSTEM_KEYMASTER_RSA_KEY_FACTORY_H_
