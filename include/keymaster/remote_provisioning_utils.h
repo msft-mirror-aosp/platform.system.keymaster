@@ -35,8 +35,8 @@ template <typename T> class StatusOr {
   public:
     StatusOr(int32_t status_code)  // NOLINT(google-explicit-constructor)
         : status_code_(status_code) {}
-    StatusOr(T val)
-        : status_code_(0), value_(std::move(val)) {}  // NOLINT(google-explicit-constructor)
+    StatusOr(T val)  // NOLINT(google-explicit-constructor)
+        : status_code_(0), value_(std::move(val)) {}
 
     bool isOk() { return status_code_ == 0; }
 
@@ -70,7 +70,7 @@ validateAndExtractEekPubAndId(bool testMode, const KeymasterBlob& endpointEncryp
 
 StatusOr<std::vector<uint8_t> /* pubkeys */>
 validateAndExtractPubkeys(bool testMode, uint32_t numKeys, KeymasterBlob* keysToSign,
-                          cppcose::HmacSha256Function macFunction);
+                          const cppcose::HmacSha256Function& macFunction);
 
 cppbor::Array buildCertReqRecipients(const std::vector<uint8_t>& pubkey,
                                      const std::vector<uint8_t>& kid);
