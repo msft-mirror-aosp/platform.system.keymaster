@@ -21,6 +21,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <string>
+#include <string_view>
+#include <vector>
+
 #include <keymaster/android_keymaster_utils.h>
 #include <keymaster/authorization_set.h>
 #include <keymaster/km_version.h>
@@ -61,6 +65,9 @@ enum AndroidKeymasterCommand : uint32_t {
     GENERATE_RKP_KEY = 29,
     GENERATE_CSR = 30,
     GENERATE_TIMESTAMP_TOKEN = 31,
+    CONFIGURE_VENDOR_PATCHLEVEL = 32,
+    CONFIGURE_BOOT_PATCHLEVEL = 33,
+    CONFIGURE_VERIFIED_BOOT_INFO = 34,
 };
 
 /**
@@ -110,7 +117,7 @@ constexpr int32_t kDefaultMessageVersion = 3;
  * date in YYYYMMDD format (it's not recommended to change message formats within a KM version, but
  * it could happen).
  */
-inline constexpr int32_t MessageVersion(KmVersion version, uint32_t /* km_date */ = 0) {
+inline int32_t MessageVersion(KmVersion version, uint32_t /* km_date */ = 0) {
     switch (version) {
     case KmVersion::KEYMASTER_1:
         return 1;
@@ -122,6 +129,7 @@ inline constexpr int32_t MessageVersion(KmVersion version, uint32_t /* km_date *
     case KmVersion::KEYMASTER_4_1:
         return 3;
     case KmVersion::KEYMINT_1:
+    case KmVersion::KEYMINT_2:
         return 4;
     }
     return kInvalidMessageVersion;
@@ -401,7 +409,7 @@ struct GenerateCsrRequest : public KeymasterMessage {
 
     bool test_mode = false;
     size_t num_keys = 0;
-    KeymasterBlob* keys_to_sign_array;
+    KeymasterBlob* keys_to_sign_array = nullptr;
     KeymasterBlob endpoint_enc_cert_chain;
     KeymasterBlob challenge;
 };
@@ -751,7 +759,7 @@ struct ConfigureRequest : public KeymasterMessage {
     }
 
     uint32_t os_version;
-    uint32_t os_patchlevel;
+    uint32_t os_patchlevel;  // YYYYMM
 };
 
 using ConfigureResponse = EmptyKeymasterResponse;
@@ -1142,5 +1150,69 @@ struct SetAttestationIdsRequest : public KeymasterMessage {
 };
 
 using SetAttestationIdsResponse = EmptyKeymasterResponse;
+
+struct ConfigureVendorPatchlevelRequest : public KeymasterMessage {
+    explicit ConfigureVendorPatchlevelRequest(int32_t ver) : KeymasterMessage(ver) {}
+
+    size_t SerializedSize() const override { return sizeof(vendor_patchlevel); }
+    uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const override {
+        return append_uint32_to_buf(buf, end, vendor_patchlevel);
+    }
+    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end) override {
+        return copy_uint32_from_buf(buf_ptr, end, &vendor_patchlevel);
+    }
+
+    uint32_t vendor_patchlevel{};  // YYYYMMDD
+};
+
+using ConfigureVendorPatchlevelResponse = EmptyKeymasterResponse;
+
+struct ConfigureBootPatchlevelRequest : public KeymasterMessage {
+    explicit ConfigureBootPatchlevelRequest(int32_t ver) : KeymasterMessage(ver) {}
+
+    size_t SerializedSize() const override { return sizeof(boot_patchlevel); }
+    uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const override {
+        return append_uint32_to_buf(buf, end, boot_patchlevel);
+    }
+    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end) override {
+        return copy_uint32_from_buf(buf_ptr, end, &boot_patchlevel);
+    }
+
+    uint32_t boot_patchlevel{};  // YYYYMMDD
+};
+
+using ConfigureBootPatchlevelResponse = EmptyKeymasterResponse;
+
+struct ConfigureVerifiedBootInfoRequest : public KeymasterMessage {
+    explicit ConfigureVerifiedBootInfoRequest(int32_t ver)
+        : ConfigureVerifiedBootInfoRequest(ver, {}, {}, {}) {}
+
+    ConfigureVerifiedBootInfoRequest(int32_t ver, std::string_view boot_state_param,
+                                     std::string_view bootloader_state_param,
+                                     std::vector<uint8_t> vbmeta_digest_param)
+        : KeymasterMessage(ver), boot_state(boot_state_param),
+          bootloader_state(bootloader_state_param), vbmeta_digest(std::move(vbmeta_digest_param)) {}
+
+    size_t SerializedSize() const override {
+        return sizeof(uint32_t) + sizeof(uint32_t) + sizeof(uint32_t)  // buffer sizes
+               + boot_state.size() + bootloader_state.size() + vbmeta_digest.size();
+    }
+    uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const override {
+        buf = append_collection_to_buf(buf, end, boot_state);
+        buf = append_collection_to_buf(buf, end, bootloader_state);
+        return append_collection_to_buf(buf, end, vbmeta_digest);
+    }
+    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end) override {
+        return copy_collection_from_buf(buf_ptr, end, &boot_state) &&
+               copy_collection_from_buf(buf_ptr, end, &bootloader_state) &&
+               copy_collection_from_buf(buf_ptr, end, &vbmeta_digest);
+    }
+
+    std::string boot_state;
+    std::string bootloader_state;
+    std::vector<uint8_t> vbmeta_digest;
+};
+
+using ConfigureVerifiedBootInfoResponse = EmptyKeymasterResponse;
 
 }  // namespace keymaster

@@ -238,20 +238,24 @@ keymaster_error_t ParseAuthEncryptedBlob(const KeymasterKeyBlob& blob,
                                          KeymasterKeyBlob* key_material,
                                          AuthorizationSet* hw_enforced,
                                          AuthorizationSet* sw_enforced) {
-    keymaster_error_t error;
-    DeserializedKey key = DeserializeAuthEncryptedBlob(blob, &error);
-    if (error != KM_ERROR_OK) return error;
+    KmErrorOr<DeserializedKey> key = DeserializeAuthEncryptedBlob(blob);
+    if (!key) return key.error();
 
-    *key_material = DecryptKey(key, hidden, MASTER_KEY, &error);
-    *hw_enforced = move(key.hw_enforced);
-    *sw_enforced = move(key.sw_enforced);
-    return error;
+    KmErrorOr<KeymasterKeyBlob> decrypted =
+        DecryptKey(*key, hidden, SecureDeletionData(), MASTER_KEY);
+    if (!decrypted) return decrypted.error();
+
+    *key_material = std::move(*decrypted);
+    *hw_enforced = std::move(key->hw_enforced);
+    *sw_enforced = std::move(key->sw_enforced);
+
+    return KM_ERROR_OK;
 }
 
 keymaster_error_t SetKeyBlobAuthorizations(const AuthorizationSet& key_description,
                                            keymaster_key_origin_t origin, uint32_t os_version,
                                            uint32_t os_patchlevel, AuthorizationSet* hw_enforced,
-                                           AuthorizationSet* sw_enforced) {
+                                           AuthorizationSet* sw_enforced, KmVersion version) {
     sw_enforced->Clear();
 
     for (auto& entry : key_description) {
@@ -307,7 +311,7 @@ keymaster_error_t SetKeyBlobAuthorizations(const AuthorizationSet& key_descripti
             LOG_E("Tag %d not allowed in key generation/import", entry.tag);
             break;
 
-        // These are provided to support attesation key generation, but should not be included in
+        // These are provided to support attestation key generation, but should not be included in
         // the key characteristics.
         case KM_TAG_ATTESTATION_APPLICATION_ID:
         case KM_TAG_ATTESTATION_CHALLENGE:
@@ -323,6 +327,7 @@ keymaster_error_t SetKeyBlobAuthorizations(const AuthorizationSet& key_descripti
         case KM_TAG_CERTIFICATE_SUBJECT:
         case KM_TAG_CERTIFICATE_NOT_BEFORE:
         case KM_TAG_CERTIFICATE_NOT_AFTER:
+        case KM_TAG_INCLUDE_UNIQUE_ID:
         case KM_TAG_RESET_SINCE_ID_ROTATION:
             break;
 
@@ -341,7 +346,6 @@ keymaster_error_t SetKeyBlobAuthorizations(const AuthorizationSet& key_descripti
         case KM_TAG_DIGEST:
         case KM_TAG_EARLY_BOOT_ONLY:
         case KM_TAG_EC_CURVE:
-        case KM_TAG_INCLUDE_UNIQUE_ID:
         case KM_TAG_KEY_SIZE:
         case KM_TAG_MAX_BOOT_LEVEL:
         case KM_TAG_MAX_USES_PER_BOOT:
@@ -373,11 +377,27 @@ keymaster_error_t SetKeyBlobAuthorizations(const AuthorizationSet& key_descripti
     pseudo_hw_enforced->push_back(TAG_OS_VERSION, os_version);
     pseudo_hw_enforced->push_back(TAG_OS_PATCHLEVEL, os_patchlevel);
 
-    // Honor caller creation, if provided.
-    if (!sw_enforced->Contains(TAG_CREATION_DATETIME)) {
+    // For KeyMaster implementations (but not KeyMint implementations), we need to add a
+    // CREATION_DATETIME into software-enforced if one was not provided.
+    if (version < KmVersion::KEYMINT_1 && !sw_enforced->Contains(TAG_CREATION_DATETIME)) {
         sw_enforced->push_back(TAG_CREATION_DATETIME, java_time(time(nullptr)));
     }
 
+    return TranslateAuthorizationSetError(sw_enforced->is_valid());
+}
+
+keymaster_error_t ExtendKeyBlobAuthorizations(AuthorizationSet* hw_enforced,
+                                              AuthorizationSet* sw_enforced,
+                                              std::optional<uint32_t> vendor_patchlevel,
+                                              std::optional<uint32_t> boot_patchlevel) {
+    // If hw_enforced is non-empty, we're pretending to be some sort of secure hardware.
+    AuthorizationSet* pseudo_hw_enforced = (hw_enforced->empty()) ? sw_enforced : hw_enforced;
+    if (vendor_patchlevel.has_value()) {
+        pseudo_hw_enforced->push_back(TAG_VENDOR_PATCHLEVEL, vendor_patchlevel.value());
+    }
+    if (boot_patchlevel.has_value()) {
+        pseudo_hw_enforced->push_back(TAG_BOOT_PATCHLEVEL, boot_patchlevel.value());
+    }
     return TranslateAuthorizationSetError(sw_enforced->is_valid());
 }
 
@@ -385,6 +405,18 @@ keymaster_error_t UpgradeSoftKeyBlob(const UniquePtr<Key>& key, const uint32_t o
                                      const uint32_t os_patchlevel,
                                      const AuthorizationSet& upgrade_params,
                                      KeymasterKeyBlob* upgraded_key) {
+    return FullUpgradeSoftKeyBlob(key, os_version, os_patchlevel,
+                                  /* vendor_patchlevel= */ std::nullopt,
+                                  /* boot_patchlevel= */ std::nullopt,  //
+                                  upgrade_params, upgraded_key);
+}
+
+keymaster_error_t FullUpgradeSoftKeyBlob(const UniquePtr<Key>& key, const uint32_t os_version,
+                                         uint32_t os_patchlevel,
+                                         std::optional<uint32_t> vendor_patchlevel,
+                                         std::optional<uint32_t> boot_patchlevel,
+                                         const AuthorizationSet& upgrade_params,
+                                         KeymasterKeyBlob* upgraded_key) {
     bool set_changed = false;
 
     if (os_version == 0) {
@@ -402,13 +434,21 @@ keymaster_error_t UpgradeSoftKeyBlob(const UniquePtr<Key>& key, const uint32_t o
     }
 
     if (!UpgradeIntegerTag(TAG_OS_VERSION, os_version, &key->sw_enforced(), &set_changed) ||
-        !UpgradeIntegerTag(TAG_OS_PATCHLEVEL, os_patchlevel, &key->sw_enforced(), &set_changed))
+        !UpgradeIntegerTag(TAG_OS_PATCHLEVEL, os_patchlevel, &key->sw_enforced(), &set_changed) ||
+        (vendor_patchlevel.has_value() &&
+         !UpgradeIntegerTag(TAG_VENDOR_PATCHLEVEL, vendor_patchlevel.value(), &key->sw_enforced(),
+                            &set_changed)) ||
+        (boot_patchlevel.has_value() &&
+         !UpgradeIntegerTag(TAG_BOOT_PATCHLEVEL, boot_patchlevel.value(), &key->sw_enforced(),
+                            &set_changed))) {
         // One of the version fields would have been a downgrade. Not allowed.
         return KM_ERROR_INVALID_ARGUMENT;
+    }
 
-    if (!set_changed)
+    if (!set_changed) {
         // Dont' need an upgrade.
         return KM_ERROR_OK;
+    }
 
     AuthorizationSet hidden;
     auto error = BuildHiddenAuthorizations(upgrade_params, &hidden, softwareRootOfTrust);
