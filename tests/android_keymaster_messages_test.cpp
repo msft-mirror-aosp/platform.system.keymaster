@@ -675,6 +675,66 @@ TEST(RoundTrip, ConfigureRequest) {
     }
 }
 
+TEST(RoundTrip, ConfigureResponse) {
+    for (int ver = 0; ver <= kMaxMessageVersion; ++ver) {
+        ConfigureResponse rsp(ver);
+        UniquePtr<ConfigureResponse> deserialized(round_trip(ver, rsp, 4));
+    }
+}
+
+TEST(RoundTrip, ConfigureVendorPatchlevelRequest) {
+    for (int ver = 0; ver <= kMaxMessageVersion; ++ver) {
+        ConfigureVendorPatchlevelRequest req(ver);
+        req.vendor_patchlevel = 2;
+
+        UniquePtr<ConfigureVendorPatchlevelRequest> deserialized(round_trip(ver, req, 4));
+        EXPECT_EQ(deserialized->vendor_patchlevel, req.vendor_patchlevel);
+    }
+}
+
+TEST(RoundTrip, ConfigureVendorPatchlevelResponse) {
+    for (int ver = 0; ver <= kMaxMessageVersion; ++ver) {
+        ConfigureVendorPatchlevelResponse rsp(ver);
+        UniquePtr<ConfigureVendorPatchlevelResponse> deserialized(round_trip(ver, rsp, 4));
+    }
+}
+
+TEST(RoundTrip, ConfigureBootPatchlevelRequest) {
+    for (int ver = 0; ver <= kMaxMessageVersion; ++ver) {
+        ConfigureBootPatchlevelRequest req(ver);
+        req.boot_patchlevel = 2;
+
+        UniquePtr<ConfigureBootPatchlevelRequest> deserialized(round_trip(ver, req, 4));
+        EXPECT_EQ(deserialized->boot_patchlevel, req.boot_patchlevel);
+    }
+}
+
+TEST(RoundTrip, ConfigureBootPatchlevelResponse) {
+    for (int ver = 0; ver <= kMaxMessageVersion; ++ver) {
+        ConfigureBootPatchlevelResponse rsp(ver);
+        UniquePtr<ConfigureBootPatchlevelResponse> deserialized(round_trip(ver, rsp, 4));
+    }
+}
+
+TEST(RoundTrip, ConfigureVerifiedBootInfoRequest) {
+    for (int32_t ver = 0; ver <= kMaxMessageVersion; ++ver) {
+        ConfigureVerifiedBootInfoRequest req(ver, "super", "duper", {1, 2, 3, 4, 5, 6});
+
+        UniquePtr<ConfigureVerifiedBootInfoRequest> deserialized(round_trip(ver, req, 28));
+        ASSERT_NE(deserialized, nullptr);
+        EXPECT_EQ(deserialized->boot_state, req.boot_state);
+        EXPECT_EQ(deserialized->bootloader_state, req.bootloader_state);
+        EXPECT_EQ(deserialized->vbmeta_digest, req.vbmeta_digest);
+    }
+}
+
+TEST(RoundTrip, ConfigureVerifiedBootInfoResponse) {
+    for (int ver = 0; ver <= kMaxMessageVersion; ++ver) {
+        ConfigureVerifiedBootInfoResponse rsp(ver);
+        UniquePtr<ConfigureVerifiedBootInfoResponse> deserialized(round_trip(ver, rsp, 4));
+    }
+}
+
 TEST(RoundTrip, AddEntropyRequest) {
     for (int ver = 0; ver <= kMaxMessageVersion; ++ver) {
         AddEntropyRequest msg(ver);
@@ -913,6 +973,7 @@ GARBAGE_TEST(UpgradeKeyResponse);
 GARBAGE_TEST(GenerateTimestampTokenRequest);
 GARBAGE_TEST(GenerateTimestampTokenResponse);
 GARBAGE_TEST(SetAttestationIdsRequest);
+GARBAGE_TEST(ConfigureVerifiedBootInfoRequest);
 
 }  // namespace test
 

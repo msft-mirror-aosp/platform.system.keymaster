@@ -17,8 +17,11 @@
 
 #pragma once
 
+#include <optional>
+
 #include <hardware/keymaster_defs.h>
 #include <keymaster/android_keymaster_utils.h>
+#include <keymaster/km_version.h>
 #include <openssl/base.h>
 
 namespace keymaster {
@@ -51,9 +54,23 @@ keymaster_error_t ParseAuthEncryptedBlob(const KeymasterKeyBlob& blob,
 keymaster_error_t SetKeyBlobAuthorizations(const AuthorizationSet& key_description,
                                            keymaster_key_origin_t origin, uint32_t os_version,
                                            uint32_t os_patchlevel, AuthorizationSet* hw_enforced,
-                                           AuthorizationSet* sw_enforced);
+                                           AuthorizationSet* sw_enforced,
+                                           KmVersion version = KmVersion::KEYMINT_1);
+
+keymaster_error_t ExtendKeyBlobAuthorizations(AuthorizationSet* hw_enforced,
+                                              AuthorizationSet* sw_enforced,
+                                              std::optional<uint32_t> vendor_patchlevel,
+                                              std::optional<uint32_t> boot_patchlevel);
+
 keymaster_error_t UpgradeSoftKeyBlob(const UniquePtr<Key>& key, const uint32_t os_version,
                                      const uint32_t os_patchlevel,
                                      const AuthorizationSet& upgrade_params,
                                      KeymasterKeyBlob* upgraded_key);
+
+keymaster_error_t FullUpgradeSoftKeyBlob(const UniquePtr<Key>& key, const uint32_t os_version,
+                                         uint32_t os_patchlevel,
+                                         std::optional<uint32_t> vendor_patchlevel,
+                                         std::optional<uint32_t> boot_patchlevel,
+                                         const AuthorizationSet& upgrade_params,
+                                         KeymasterKeyBlob* upgraded_key);
 }  // namespace keymaster

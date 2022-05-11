@@ -17,7 +17,9 @@
 #ifndef SYSTEM_KEYMASTER_KEYMASTER_CONFIGURATION_H_
 #define SYSTEM_KEYMASTER_KEYMASTER_CONFIGURATION_H_
 
+#include <optional>
 #include <string>
+#include <vector>
 
 #include <stdint.h>
 
@@ -48,15 +50,45 @@ uint32_t GetOsVersion();
 /**
  * Parses OS patch level string, returning year and month in integer form. For example, "2016-03-25"
  * will be returned as 201603. Returns 0 if the string doesn't contain a date in the form
- * YYYY-MM-DD.
+ * YYYY-MM-DD; returns YYYMM on success.
  */
 uint32_t GetOsPatchlevel(const char* patchlevel_string);
 
 /**
  * Retrieves and parses OS patch level from build properties. Returns 0 if the string doesn't
- * contain a date in the form YYYY-MM-DD.
+ * contain a date in the form YYYY-MM-DD; returns YYYYMM on success.
  */
 uint32_t GetOsPatchlevel();
+
+/**
+ * Retrieves and parses vendor patch level from build properties (which may require SELinux
+ * permission). Returns 0 if the string doesn't contain a date in the form YYYY-MM-DD; returns
+ * YYYYMMDD on success.
+ */
+uint32_t GetVendorPatchlevel();
+
+/**
+ * Retrieves the verified boot state from properties (which may require SELinux permission).
+ */
+std::string GetVerifiedBootState();
+
+/**
+ * Retrieves the bootloader state (locked or unlocked) from properties (which may require
+ * SELinux permission).
+ */
+std::string GetBootloaderState();
+
+/**
+ * Parses the given verified boot metadata digest. Returns nullopt if the value is not a binary
+ * string.
+ */
+std::optional<std::vector<uint8_t>> GetVbmetaDigest(std::string_view vbmeta_string);
+
+/**
+ * Retrieves and parses the verified boot metadata digest from properties (which may require
+ * SELinux permission). Returns nullopt if the property is not a binary string.
+ */
+std::optional<std::vector<uint8_t>> GetVbmetaDigest();
 
 }  // namespace keymaster
 
