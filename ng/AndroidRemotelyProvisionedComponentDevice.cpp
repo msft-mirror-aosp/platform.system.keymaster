@@ -83,10 +83,9 @@ AndroidRemotelyProvisionedComponentDevice::AndroidRemotelyProvisionedComponentDe
 }
 
 ScopedAStatus AndroidRemotelyProvisionedComponentDevice::getHardwareInfo(RpcHardwareInfo* info) {
-    info->versionNumber = 2;
+    info->versionNumber = 1;
     info->rpcAuthorName = "Google";
     info->supportedEekCurve = RpcHardwareInfo::CURVE_25519;
-    info->uniqueId = "default keymint";
     return ScopedAStatus::ok();
 }
 
@@ -112,10 +111,7 @@ ScopedAStatus AndroidRemotelyProvisionedComponentDevice::generateCertificateRequ
     GenerateCsrRequest request(impl_->message_version());
     request.test_mode = testMode;
     request.num_keys = keysToSign.size();
-    request.keys_to_sign_array = new (std::nothrow) KeymasterBlob[keysToSign.size()];
-    if (request.keys_to_sign_array == nullptr) {
-        return km_utils::kmError2ScopedAStatus(KM_ERROR_MEMORY_ALLOCATION_FAILED);
-    }
+    request.keys_to_sign_array = new KeymasterBlob[keysToSign.size()];
     for (size_t i = 0; i < keysToSign.size(); i++) {
         request.SetKeyToSign(i, keysToSign[i].macedKey.data(), keysToSign[i].macedKey.size());
     }

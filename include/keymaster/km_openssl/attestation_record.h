@@ -34,9 +34,6 @@ class AttestationContext;
 
 constexpr KmVersion kCurrentKmVersion = KmVersion::KEYMASTER_4_1;
 
-// Size (in bytes) of generated UNIQUE_ID values.
-constexpr int UNIQUE_ID_SIZE = 16;
-
 constexpr int EAT_CLAIM_PRIVATE_BASE = -80000;
 constexpr int EAT_CLAIM_PRIVATE_NON_KM_BASE = EAT_CLAIM_PRIVATE_BASE - 2000;
 
@@ -346,15 +343,6 @@ keymaster_error_t build_eat_record(const AuthorizationSet& attestation_params,
                                    const AttestationContext& context,  //
                                    std::vector<uint8_t>* eat_token);
 
-// Builds the input to HMAC-SHA256 for unique ID generation.
-std::vector<uint8_t> build_unique_id_input(uint64_t creation_date_time,
-                                           const keymaster_blob_t& application_id,
-                                           bool reset_since_rotation);
-
-// Builds a unique ID of size UNIQUE_ID_SIZE from the given inputs.
-Buffer generate_unique_id(const std::vector<uint8_t>& hbk, uint64_t creation_date_time,
-                          const keymaster_blob_t& application_id, bool reset_since_rotation);
-
 /**
  * Helper functions for attestation record tests. Caller takes ownership of
  * |attestation_challenge->data| and |unique_id->data|, deallocate using delete[].
@@ -416,8 +404,6 @@ inline static uint version_to_attestation_km_version(KmVersion version) {
         return 41;
     case KmVersion::KEYMINT_1:
         return 100;
-    case KmVersion::KEYMINT_2:
-        return 200;
     }
 }
 
@@ -439,8 +425,6 @@ inline static uint version_to_attestation_version(KmVersion version) {
         return 4;
     case KmVersion::KEYMINT_1:
         return 100;
-    case KmVersion::KEYMINT_2:
-        return 200;
     }
 }
 
