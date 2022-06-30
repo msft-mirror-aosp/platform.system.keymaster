@@ -54,11 +54,14 @@ PureSoftKeymasterContext::PureSoftKeymasterContext(KmVersion version,
                                                    keymaster_security_level_t security_level)
 
     : SoftAttestationContext(version),
-      rsa_factory_(new RsaKeyFactory(*this /* blob_maker */, *this /* context */)),
-      ec_factory_(new EcKeyFactory(*this /* blob_maker */, *this /* context */)),
-      aes_factory_(new AesKeyFactory(*this /* blob_maker */, *this /* random_source */)),
-      tdes_factory_(new TripleDesKeyFactory(*this /* blob_maker */, *this /* random_source */)),
-      hmac_factory_(new HmacKeyFactory(*this /* blob_maker */, *this /* random_source */)),
+      rsa_factory_(new (std::nothrow) RsaKeyFactory(*this /* blob_maker */, *this /* context */)),
+      ec_factory_(new (std::nothrow) EcKeyFactory(*this /* blob_maker */, *this /* context */)),
+      aes_factory_(new (std::nothrow)
+                       AesKeyFactory(*this /* blob_maker */, *this /* random_source */)),
+      tdes_factory_(new (std::nothrow)
+                        TripleDesKeyFactory(*this /* blob_maker */, *this /* random_source */)),
+      hmac_factory_(new (std::nothrow)
+                        HmacKeyFactory(*this /* blob_maker */, *this /* random_source */)),
       os_version_(0), os_patchlevel_(0), soft_keymaster_enforcement_(64, 64),
       security_level_(security_level) {
     // We're pretending to be some sort of secure hardware which supports secure key storage,
@@ -68,7 +71,7 @@ PureSoftKeymasterContext::PureSoftKeymasterContext(KmVersion version,
     }
     if (version >= KmVersion::KEYMINT_1) {
         pure_soft_remote_provisioning_context_ =
-            std::make_unique<PureSoftRemoteProvisioningContext>();
+            std::make_unique<PureSoftRemoteProvisioningContext>(security_level_);
     }
 }
 
@@ -78,6 +81,9 @@ keymaster_error_t PureSoftKeymasterContext::SetSystemVersion(uint32_t os_version
                                                              uint32_t os_patchlevel) {
     os_version_ = os_version;
     os_patchlevel_ = os_patchlevel;
+    if (pure_soft_remote_provisioning_context_ != nullptr) {
+        pure_soft_remote_provisioning_context_->SetSystemVersion(os_version, os_patchlevel);
+    }
     return KM_ERROR_OK;
 }
 
@@ -85,6 +91,53 @@ void PureSoftKeymasterContext::GetSystemVersion(uint32_t* os_version,
                                                 uint32_t* os_patchlevel) const {
     *os_version = os_version_;
     *os_patchlevel = os_patchlevel_;
+}
+
+keymaster_error_t
+PureSoftKeymasterContext::SetVerifiedBootInfo(std::string_view boot_state,
+                                              std::string_view bootloader_state,
+                                              const std::vector<uint8_t>& vbmeta_digest) {
+    if (verified_boot_state_.has_value() && boot_state != verified_boot_state_.value()) {
+        return KM_ERROR_INVALID_ARGUMENT;
+    }
+    if (bootloader_state_.has_value() && bootloader_state != bootloader_state_.value()) {
+        return KM_ERROR_INVALID_ARGUMENT;
+    }
+    if (vbmeta_digest_.has_value() && vbmeta_digest != vbmeta_digest_.value()) {
+        return KM_ERROR_INVALID_ARGUMENT;
+    }
+    verified_boot_state_ = boot_state;
+    bootloader_state_ = bootloader_state;
+    vbmeta_digest_ = vbmeta_digest;
+    if (pure_soft_remote_provisioning_context_ != nullptr) {
+        pure_soft_remote_provisioning_context_->SetVerifiedBootInfo(boot_state, bootloader_state,
+                                                                    vbmeta_digest);
+    }
+    return KM_ERROR_OK;
+}
+
+keymaster_error_t PureSoftKeymasterContext::SetVendorPatchlevel(uint32_t vendor_patchlevel) {
+    if (vendor_patchlevel_.has_value() && vendor_patchlevel != vendor_patchlevel_.value()) {
+        // Can't set patchlevel to a different value.
+        return KM_ERROR_INVALID_ARGUMENT;
+    }
+    vendor_patchlevel_ = vendor_patchlevel;
+    if (pure_soft_remote_provisioning_context_ != nullptr) {
+        pure_soft_remote_provisioning_context_->SetVendorPatchlevel(vendor_patchlevel);
+    }
+    return KM_ERROR_OK;
+}
+
+keymaster_error_t PureSoftKeymasterContext::SetBootPatchlevel(uint32_t boot_patchlevel) {
+    if (boot_patchlevel_.has_value() && boot_patchlevel != boot_patchlevel_.value()) {
+        // Can't set patchlevel to a different value.
+        return KM_ERROR_INVALID_ARGUMENT;
+    }
+    boot_patchlevel_ = boot_patchlevel;
+    if (pure_soft_remote_provisioning_context_ != nullptr) {
+        pure_soft_remote_provisioning_context_->SetBootPatchlevel(boot_patchlevel);
+    }
+    return KM_ERROR_OK;
 }
 
 KeyFactory* PureSoftKeymasterContext::GetKeyFactory(keymaster_algorithm_t algorithm) const {

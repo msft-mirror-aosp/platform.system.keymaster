@@ -18,10 +18,12 @@
 #define SYSTEM_KEYMASTER_KEYMASTER_CONTEXT_H_
 
 #include <optional>
+#include <string_view>
 
 #include <assert.h>
 
 #include <hardware/keymaster_defs.h>
+
 #include <keymaster/android_keymaster_utils.h>
 #include <keymaster/keymaster_enforcement.h>
 #include <keymaster/km_version.h>
@@ -31,6 +33,7 @@
 namespace keymaster {
 
 class AuthorizationSet;
+class AttestationContext;
 class KeyFactory;
 class OperationFactory;
 class SecureDeletionSecretStorage;
@@ -150,6 +153,11 @@ class KeymasterContext {
     virtual KeymasterEnforcement* enforcement_policy() = 0;
 
     /**
+     * Return the attestation context for this context.
+     */
+    virtual AttestationContext* attestation_context() { return nullptr; }
+
+    /**
      * Generate an attestation certificate, with chain.
      *
      * If attest_key is null, the certificate will be signed with the factory attestation key (from
@@ -225,6 +233,16 @@ class KeymasterContext {
     virtual RemoteProvisioningContext* GetRemoteProvisioningContext() const { return nullptr; }
 
     /**
+     * Sets the verified boot metadata. This value should be set by the bootloader.
+     * A subsequent to set a different value will return KM_ERROR_INVALID_ARGUMENT.
+     */
+    virtual keymaster_error_t SetVerifiedBootInfo(std::string_view /*verified_boot_state*/,
+                                                  std::string_view /*bootloader_state*/,
+                                                  const std::vector<uint8_t>& /*vbmeta_digest*/) {
+        return KM_ERROR_UNIMPLEMENTED;
+    }
+
+    /**
      * Sets the vendor patchlevel (format YYYYMMDD) for the implementation. This value should
      * be set by the HAL service at start of day.  A subsequent attempt to set a different
      * value will return KM_ERROR_INVALID_ARGUMENT.
@@ -236,7 +254,7 @@ class KeymasterContext {
     /**
      * Sets the boot patchlevel (format YYYYMMDD) for the implementation. This value should be set
      * by the bootloader.  A subsequent to set a different value will return
-     * KM_ERROR_INVALID_ARGUMENT;
+     * KM_ERROR_INVALID_ARGUMENT.
      */
     virtual keymaster_error_t SetBootPatchlevel(uint32_t /* boot_patchlevel */) {
         return KM_ERROR_UNIMPLEMENTED;
