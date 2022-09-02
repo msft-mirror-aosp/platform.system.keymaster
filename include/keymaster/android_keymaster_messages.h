@@ -23,6 +23,7 @@
 
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include <keymaster/android_keymaster_utils.h>
@@ -68,6 +69,7 @@ enum AndroidKeymasterCommand : uint32_t {
     CONFIGURE_VENDOR_PATCHLEVEL = 32,
     CONFIGURE_BOOT_PATCHLEVEL = 33,
     CONFIGURE_VERIFIED_BOOT_INFO = 34,
+    GET_ROOT_OF_TRUST = 35,
 };
 
 /**
@@ -767,11 +769,11 @@ using ConfigureResponse = EmptyKeymasterResponse;
 struct HmacSharingParameters : public Serializable {
     HmacSharingParameters() : seed({}) { memset(nonce, 0, sizeof(nonce)); }
     HmacSharingParameters(HmacSharingParameters&& other) {
-        seed = move(other.seed);
+        seed = std::move(other.seed);
         memcpy(nonce, other.nonce, sizeof(nonce));
     }
 
-    void SetSeed(KeymasterBlob&& value) { seed = move(value); }
+    void SetSeed(KeymasterBlob&& value) { seed = std::move(value); }
 
     size_t SerializedSize() const override;
     uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const override;
@@ -807,9 +809,9 @@ struct GetHmacSharingParametersRequest : public EmptyKeymasterRequest {
 struct GetHmacSharingParametersResponse : public KeymasterResponse {
     explicit GetHmacSharingParametersResponse(int32_t ver) : KeymasterResponse(ver) {}
     GetHmacSharingParametersResponse(GetHmacSharingParametersResponse&& other)
-        : KeymasterResponse(other.message_version), params(move(other.params)) {}
+        : KeymasterResponse(other.message_version), params(std::move(other.params)) {}
 
-    void SetSeed(KeymasterBlob&& seed_data) { params.SetSeed(move(seed_data)); }
+    void SetSeed(KeymasterBlob&& seed_data) { params.SetSeed(std::move(seed_data)); }
 
     size_t NonErrorSerializedSize() const override { return params.SerializedSize(); }
     uint8_t* NonErrorSerialize(uint8_t* buf, const uint8_t* end) const override {
@@ -838,8 +840,9 @@ struct ComputeSharedHmacRequest : public KeymasterMessage {
 
 struct ComputeSharedHmacResponse : public KeymasterResponse {
     explicit ComputeSharedHmacResponse(int32_t ver) : KeymasterResponse(ver) {}
-    ComputeSharedHmacResponse(ComputeSharedHmacResponse&& other) : KeymasterResponse(move(other)) {
-        sharing_check = move(other.sharing_check);
+    ComputeSharedHmacResponse(ComputeSharedHmacResponse&& other)
+        : KeymasterResponse(other.message_version) {
+        sharing_check = std::move(other.sharing_check);
     }
 
     size_t NonErrorSerializedSize() const override;
@@ -899,7 +902,7 @@ struct HardwareAuthToken : public Serializable {
         authenticator_id = other.authenticator_id;
         authenticator_type = other.authenticator_type;
         timestamp = other.timestamp;
-        mac = move(other.mac);
+        mac = std::move(other.mac);
     }
 
     size_t SerializedSize() const override;
@@ -919,9 +922,9 @@ struct VerificationToken : public Serializable {
     VerificationToken(VerificationToken&& other) {
         challenge = other.challenge;
         timestamp = other.timestamp;
-        parameters_verified = move(other.parameters_verified);
+        parameters_verified = std::move(other.parameters_verified);
         security_level = other.security_level;
-        mac = move(other.mac);
+        mac = std::move(other.mac);
     }
 
     size_t SerializedSize() const override;
@@ -994,7 +997,7 @@ struct EarlyBootEndedResponse : public KeymasterResponse {
 struct DeviceLockedRequest : public KeymasterMessage {
     explicit DeviceLockedRequest(int32_t ver) : KeymasterMessage(ver) {}
     explicit DeviceLockedRequest(int32_t ver, bool passwordOnly_, VerificationToken&& token_)
-        : KeymasterMessage(ver), passwordOnly(passwordOnly_), token(move(token_)) {}
+        : KeymasterMessage(ver), passwordOnly(passwordOnly_), token(std::move(token_)) {}
 
     size_t SerializedSize() const override { return 1; }
     uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const override {
@@ -1057,7 +1060,7 @@ struct TimestampToken : public Serializable {
         challenge = other.challenge;
         timestamp = other.timestamp;
         security_level = other.security_level;
-        mac = move(other.mac);
+        mac = std::move(other.mac);
     }
     size_t SerializedSize() const override {
         return sizeof(challenge) + sizeof(timestamp) + sizeof(security_level) +
@@ -1214,5 +1217,37 @@ struct ConfigureVerifiedBootInfoRequest : public KeymasterMessage {
 };
 
 using ConfigureVerifiedBootInfoResponse = EmptyKeymasterResponse;
+
+struct GetRootOfTrustRequest : public KeymasterMessage {
+    explicit GetRootOfTrustRequest(int32_t ver) : GetRootOfTrustRequest(ver, {}) {}
+    GetRootOfTrustRequest(int32_t ver, std::vector<uint8_t> challenge_param)
+        : KeymasterMessage(ver), challenge(std::move(challenge_param)){};
+
+    size_t SerializedSize() const override { return sizeof(uint32_t) + challenge.size(); }
+    uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const override {
+        return append_collection_to_buf(buf, end, challenge);
+    }
+    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end) override {
+        return copy_collection_from_buf(buf_ptr, end, &challenge);
+    }
+
+    std::vector<uint8_t> challenge;
+};
+
+struct GetRootOfTrustResponse : public KeymasterResponse {
+    explicit GetRootOfTrustResponse(uint32_t ver) : GetRootOfTrustResponse(ver, {}) {}
+    GetRootOfTrustResponse(uint32_t ver, std::vector<uint8_t> rootOfTrust_param)
+        : KeymasterResponse(ver), rootOfTrust(std::move(rootOfTrust_param)){};
+
+    size_t NonErrorSerializedSize() const override { return sizeof(uint32_t) + rootOfTrust.size(); }
+    uint8_t* NonErrorSerialize(uint8_t* buf, const uint8_t* end) const override {
+        return append_collection_to_buf(buf, end, rootOfTrust);
+    }
+    bool NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end) override {
+        return copy_collection_from_buf(buf_ptr, end, &rootOfTrust);
+    }
+
+    std::vector<uint8_t> rootOfTrust;
+};
 
 }  // namespace keymaster

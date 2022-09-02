@@ -16,6 +16,7 @@
 
 #include <keymaster/android_keymaster.h>
 
+#include <utility>
 #include <vector>
 
 #include <assert.h>
@@ -28,6 +29,7 @@
 
 #include <keymaster/UniquePtr.h>
 #include <keymaster/android_keymaster_utils.h>
+#include <keymaster/attestation_context.h>
 #include <keymaster/cppcose/cppcose.h>
 #include <keymaster/key.h>
 #include <keymaster/key_blob_utils/ae.h>
@@ -66,6 +68,8 @@ keymaster_error_t CheckPatchLevel(const AuthorizationSet& tee_enforced,
         if (key_patchlevel < current_patchlevel) {
             return KM_ERROR_KEY_REQUIRES_UPGRADE;
         } else if (key_patchlevel > current_patchlevel) {
+            LOG_E("Key blob invalid! key patchlevel %lu is > current patchlevel %lu",
+                  (unsigned long)key_patchlevel, (unsigned long)current_patchlevel);
             return KM_ERROR_INVALID_KEY_BLOB;
         }
     }
@@ -126,7 +130,12 @@ cppcose::HmacSha256Function getMacFunction(bool test_mode,
     };
 }
 
+std::pair<const uint8_t*, size_t> blob2Pair(const keymaster_blob_t& blob) {
+    return {blob.data, blob.data_length};
+}
+
 constexpr int kP256AffinePointSize = 32;
+constexpr int kRoTVersion1 = 40001;
 
 }  // anonymous namespace
 
@@ -138,7 +147,7 @@ AndroidKeymaster::AndroidKeymaster(KeymasterContext* context, size_t operation_t
 AndroidKeymaster::~AndroidKeymaster() {}
 
 AndroidKeymaster::AndroidKeymaster(AndroidKeymaster&& other)
-    : context_(move(other.context_)), operation_table_(move(other.operation_table_)),
+    : context_(std::move(other.context_)), operation_table_(std::move(other.operation_table_)),
       message_version_(other.message_version_) {}
 
 // TODO(swillden): Unify support analysis.  Right now, we have per-keytype methods that determine if
@@ -342,7 +351,7 @@ void AndroidKeymaster::GenerateKey(const GenerateKeyRequest& request,
     response->enforced.Clear();
     response->unenforced.Clear();
     response->error = factory->GenerateKey(request.key_description,
-                                           move(attest_key),  //
+                                           std::move(attest_key),  //
                                            request.issuer_subject,
                                            &response->key_blob,  //
                                            &response->enforced,
@@ -520,8 +529,8 @@ void AndroidKeymaster::GetKeyCharacteristics(const GetKeyCharacteristicsRequest&
     if (response->error != KM_ERROR_OK) return;
 
     // scavenge the key object for the auth lists
-    response->enforced = move(key->hw_enforced());
-    response->unenforced = move(key->sw_enforced());
+    response->enforced = std::move(key->hw_enforced());
+    response->unenforced = std::move(key->sw_enforced());
 
     response->error = CheckVersionInfo(response->enforced, response->unenforced, *context_);
 }
@@ -545,7 +554,7 @@ void AndroidKeymaster::BeginOperation(const BeginOperationRequest& request,
     uint32_t sd_slot = key->secure_deletion_slot();
 
     OperationPtr operation(
-        factory->CreateOperation(move(*key), request.additional_params, &response->error));
+        factory->CreateOperation(std::move(*key), request.additional_params, &response->error));
     if (operation.get() == nullptr) return;
 
     operation->set_secure_deletion_slot(sd_slot);
@@ -573,7 +582,7 @@ void AndroidKeymaster::BeginOperation(const BeginOperationRequest& request,
     if (response->error != KM_ERROR_OK) return;
 
     response->op_handle = operation->operation_handle();
-    response->error = operation_table_->Add(move(operation));
+    response->error = operation_table_->Add(std::move(operation));
 }
 
 void AndroidKeymaster::UpdateOperation(const UpdateOperationRequest& request,
@@ -791,7 +800,7 @@ void AndroidKeymaster::ImportKey(const ImportKeyRequest& request, ImportKeyRespo
     response->error = factory->ImportKey(request.key_description,  //
                                          request.key_format,       //
                                          request.key_data,         //
-                                         move(attest_key),         //
+                                         std::move(attest_key),    //
                                          request.issuer_subject,   //
                                          &response->key_blob,      //
                                          &response->enforced,      //
@@ -925,6 +934,66 @@ DeviceLockedResponse AndroidKeymaster::DeviceLocked(const DeviceLockedRequest& r
     if (context_->enforcement_policy()) {
         context_->enforcement_policy()->device_locked(request.passwordOnly);
         response.error = KM_ERROR_OK;
+    }
+
+    return response;
+}
+
+GetRootOfTrustResponse AndroidKeymaster::GetRootOfTrust(const GetRootOfTrustRequest& request) {
+    GetRootOfTrustResponse response(message_version());
+
+    if (!context_->attestation_context()) {
+        LOG_E("Have no attestation context, cannot get RootOfTrust", 0);
+        response.error = KM_ERROR_UNIMPLEMENTED;
+        return response;
+    }
+
+    const AttestationContext::VerifiedBootParams* vbParams =
+        context_->attestation_context()->GetVerifiedBootParams(&response.error);
+    if (response.error != KM_ERROR_OK) {
+        LOG_E("Error retrieving verified boot params: %lu", response.error);
+        return response;
+    }
+
+    auto boot_patch_level = context_->GetBootPatchlevel();
+    if (!boot_patch_level) {
+        LOG_E("Error retrieving boot patch level: %lu", response.error);
+        response.error = KM_ERROR_UNIMPLEMENTED;
+        return response;
+    }
+
+    if (!context_->enforcement_policy()) {
+        LOG_E("Have no enforcement policy, cannot get RootOfTrust", 0);
+        response.error = KM_ERROR_UNIMPLEMENTED;
+        return response;
+    }
+
+    auto macFunction =
+        [&](const std::vector<uint8_t>& data) -> cppcose::ErrMsgOr<cppcose::HmacSha256> {
+        auto mac = context_->enforcement_policy()->ComputeHmac(data);
+        if (!mac) return "Failed to compute HMAC";
+        return *std::move(mac);
+    };
+
+    auto maced_root_of_trust = cppcose::constructCoseMac0(
+        macFunction,  //
+        request.challenge,
+        cppbor::SemanticTag(kRoTVersion1, cppbor::Array(                                //
+                                              blob2Pair(vbParams->verified_boot_key),   //
+                                              vbParams->device_locked,                  //
+                                              vbParams->verified_boot_state,            //
+                                              blob2Pair(vbParams->verified_boot_hash),  //
+                                              *boot_patch_level))
+            .encode());
+
+    if (!maced_root_of_trust) {
+        LOG_E("Error MACing RoT: %s", maced_root_of_trust.message().c_str());
+        response.error = KM_ERROR_UNKNOWN_ERROR;
+    } else {
+        response.error = KM_ERROR_OK;
+        response.rootOfTrust =
+            cppbor::SemanticTag(cppcose::kCoseMac0SemanticTag, *std::move(maced_root_of_trust))
+                .encode();
     }
 
     return response;

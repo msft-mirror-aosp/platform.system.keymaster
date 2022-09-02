@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <utility>
+
 #include <stdint.h>
 #include <time.h>  // for time_t.
 
@@ -253,7 +255,7 @@ keymaster_error_t EcCurveToKeySize(keymaster_ec_curve_t curve, uint32_t* key_siz
 
 template <class F> class final_action {
   public:
-    explicit final_action(F f) : f_(move(f)) {}
+    explicit final_action(F f) : f_(std::move(f)) {}
     ~final_action() { f_(); }
 
   private:
@@ -280,7 +282,8 @@ struct CertificateChain : public keymaster_cert_chain_t {
         }
     }
 
-    CertificateChain(CertificateChain&& other) : keymaster_cert_chain_t{} { *this = move(other); }
+    CertificateChain(CertificateChain&& other) : keymaster_cert_chain_t{}
+    { *this = std::move(other); }
 
     ~CertificateChain() { Clear(); }
 
@@ -326,7 +329,7 @@ struct CertificateChain : public keymaster_cert_chain_t {
     // Insert the provided blob at the front of the chain.  CertificateChain takes ownership of the
     // contents of `new_entry`.
     bool push_front(const keymaster_blob_t& new_entry) {
-        keymaster_blob_t* new_entries = new keymaster_blob_t[entry_count + 1];
+        keymaster_blob_t* new_entries = new (std::nothrow) keymaster_blob_t[entry_count + 1];
         if (!new_entries) return false;
 
         new_entries[0] = new_entry;

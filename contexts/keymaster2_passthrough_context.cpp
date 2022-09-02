@@ -17,6 +17,8 @@
 
 #include <keymaster/contexts/keymaster2_passthrough_context.h>
 
+#include <utility>
+
 #include <keymaster/legacy_support/keymaster_passthrough_engine.h>
 #include <keymaster/legacy_support/keymaster_passthrough_key.h>
 
@@ -42,7 +44,7 @@ void Keymaster2PassthroughContext::GetSystemVersion(uint32_t* os_version,
 KeyFactory* Keymaster2PassthroughContext::GetKeyFactory(keymaster_algorithm_t algorithm) const {
     auto& result = factories_[algorithm];
     if (!result) {
-        result.reset(new KeymasterPassthroughKeyFactory(engine_.get(), algorithm));
+        result.reset(new (std::nothrow) KeymasterPassthroughKeyFactory(engine_.get(), algorithm));
     }
     return result.get();
 }
@@ -105,8 +107,8 @@ Keymaster2PassthroughContext::ParseKeyBlob(const KeymasterKeyBlob& blob,
 
     KeymasterKeyBlob key_material = blob;
     auto factory = GetKeyFactory(algorithm);
-    return factory->LoadKey(move(key_material), additional_params, move(hw_enforced),
-                            move(sw_enforced), key);
+    return factory->LoadKey(std::move(key_material), additional_params, std::move(hw_enforced),
+                            std::move(sw_enforced), key);
 }
 
 keymaster_error_t Keymaster2PassthroughContext::DeleteKey(const KeymasterKeyBlob& blob) const {

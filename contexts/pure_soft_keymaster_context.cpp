@@ -18,6 +18,7 @@
 
 #include <assert.h>
 #include <memory>
+#include <utility>
 
 #include <openssl/aes.h>
 #include <openssl/evp.h>
@@ -54,11 +55,14 @@ PureSoftKeymasterContext::PureSoftKeymasterContext(KmVersion version,
                                                    keymaster_security_level_t security_level)
 
     : SoftAttestationContext(version),
-      rsa_factory_(new RsaKeyFactory(*this /* blob_maker */, *this /* context */)),
-      ec_factory_(new EcKeyFactory(*this /* blob_maker */, *this /* context */)),
-      aes_factory_(new AesKeyFactory(*this /* blob_maker */, *this /* random_source */)),
-      tdes_factory_(new TripleDesKeyFactory(*this /* blob_maker */, *this /* random_source */)),
-      hmac_factory_(new HmacKeyFactory(*this /* blob_maker */, *this /* random_source */)),
+      rsa_factory_(new (std::nothrow) RsaKeyFactory(*this /* blob_maker */, *this /* context */)),
+      ec_factory_(new (std::nothrow) EcKeyFactory(*this /* blob_maker */, *this /* context */)),
+      aes_factory_(new (std::nothrow)
+                       AesKeyFactory(*this /* blob_maker */, *this /* random_source */)),
+      tdes_factory_(new (std::nothrow)
+                        TripleDesKeyFactory(*this /* blob_maker */, *this /* random_source */)),
+      hmac_factory_(new (std::nothrow)
+                        HmacKeyFactory(*this /* blob_maker */, *this /* random_source */)),
       os_version_(0), os_patchlevel_(0), soft_keymaster_enforcement_(64, 64),
       security_level_(security_level) {
     // We're pretending to be some sort of secure hardware which supports secure key storage,
@@ -321,8 +325,8 @@ keymaster_error_t PureSoftKeymasterContext::ParseKeyBlob(const KeymasterKeyBlob&
         }
 
         auto factory = GetKeyFactory(algorithm);
-        return factory->LoadKey(move(key_material), additional_params, move(hw_enforced),
-                                move(sw_enforced), key);
+        return factory->LoadKey(std::move(key_material), additional_params, std::move(hw_enforced),
+                                std::move(sw_enforced), key);
     };
 
     AuthorizationSet hidden;
@@ -413,7 +417,8 @@ PureSoftKeymasterContext::GenerateAttestation(const Key& key,                   
     AttestKeyInfo attest_key_info(attest_key, &issuer_subject, error);
     if (*error != KM_ERROR_OK) return {};
 
-    return generate_attestation(asymmetric_key, attest_params, move(attest_key_info), *this, error);
+    return generate_attestation(asymmetric_key, attest_params, std::move(attest_key_info), *this,
+                                error);
 }
 
 CertificateChain PureSoftKeymasterContext::GenerateSelfSignedCertificate(
@@ -505,7 +510,7 @@ keymaster_error_t PureSoftKeymasterContext::UnwrapKey(
 
     AuthorizationSet out_params;
     OperationPtr operation(
-        operation_factory->CreateOperation(move(*key), wrapping_key_params, &error));
+        operation_factory->CreateOperation(std::move(*key), wrapping_key_params, &error));
     if (!operation.get()) return error;
 
     error = operation->Begin(wrapping_key_params, &out_params);
@@ -556,15 +561,16 @@ keymaster_error_t PureSoftKeymasterContext::UnwrapKey(
     if (!aes_factory) return KM_ERROR_UNKNOWN_ERROR;
 
     UniquePtr<Key> aes_key;
-    error = aes_factory->LoadKey(move(key_material), gcm_params, move(transit_key_authorizations),
-                                 AuthorizationSet(), &aes_key);
+    error = aes_factory->LoadKey(std::move(key_material), gcm_params,
+                                 std::move(transit_key_authorizations), AuthorizationSet(),
+                                 &aes_key);
     if (error != KM_ERROR_OK) return error;
 
     auto aes_operation_factory = GetOperationFactory(KM_ALGORITHM_AES, KM_PURPOSE_DECRYPT);
     if (!aes_operation_factory) return KM_ERROR_UNKNOWN_ERROR;
 
     OperationPtr aes_operation(
-        aes_operation_factory->CreateOperation(move(*aes_key), gcm_params, &error));
+        aes_operation_factory->CreateOperation(std::move(*aes_key), gcm_params, &error));
     if (!aes_operation.get()) return error;
 
     error = aes_operation->Begin(gcm_params, &out_params);

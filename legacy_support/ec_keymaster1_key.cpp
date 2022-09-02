@@ -17,6 +17,7 @@
 #include <keymaster/legacy_support/ec_keymaster1_key.h>
 
 #include <memory>
+#include <utility>
 
 #include <keymaster/km_openssl/ecdsa_operation.h>
 #include <keymaster/logger.h>
@@ -31,9 +32,9 @@ EcdsaKeymaster1KeyFactory::EcdsaKeymaster1KeyFactory(const SoftwareKeyBlobMaker&
                                                      const KeymasterContext& context,
                                                      const Keymaster1Engine* engine)
     : EcKeyFactory(blob_maker, context), engine_(engine),
-      sign_factory_(new EcdsaKeymaster1OperationFactory(KM_PURPOSE_SIGN, engine)),
+      sign_factory_(new (std::nothrow) EcdsaKeymaster1OperationFactory(KM_PURPOSE_SIGN, engine)),
       // For pubkey ops we can use the normal operation factories.
-      verify_factory_(new EcdsaVerifyOperationFactory) {}
+      verify_factory_(new (std::nothrow) EcdsaVerifyOperationFactory) {}
 
 static bool is_supported(uint32_t digest) {
     return digest == KM_DIGEST_NONE || digest == KM_DIGEST_SHA_2_256;
@@ -112,10 +113,11 @@ keymaster_error_t EcdsaKeymaster1KeyFactory::LoadKey(KeymasterKeyBlob&& key_mate
     if (!ecdsa) return error;
 
     key->reset(new (std::nothrow)
-                   EcdsaKeymaster1Key(ecdsa.release(), move(hw_enforced), move(sw_enforced), this));
+                   EcdsaKeymaster1Key(ecdsa.release(), std::move(hw_enforced),
+                                      std::move(sw_enforced), this));
     if (!(*key)) return KM_ERROR_MEMORY_ALLOCATION_FAILED;
 
-    (*key)->key_material() = move(key_material);
+    (*key)->key_material() = std::move(key_material);
     return KM_ERROR_OK;
 }
 

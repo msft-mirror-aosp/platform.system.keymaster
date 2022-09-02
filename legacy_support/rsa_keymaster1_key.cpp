@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 
-#include <keymaster/contexts/soft_keymaster_context.h>
 #include <keymaster/legacy_support/rsa_keymaster1_key.h>
 
+#include <utility>
+
+#include <keymaster/contexts/soft_keymaster_context.h>
 #include <keymaster/km_openssl/openssl_utils.h>
 #include <keymaster/logger.h>
 
@@ -28,11 +30,12 @@ RsaKeymaster1KeyFactory::RsaKeymaster1KeyFactory(const SoftwareKeyBlobMaker& blo
                                                  const KeymasterContext& context,
                                                  const Keymaster1Engine* engine)
     : RsaKeyFactory(blob_maker, context), engine_(engine),
-      sign_factory_(new RsaKeymaster1OperationFactory(KM_PURPOSE_SIGN, engine)),
-      decrypt_factory_(new RsaKeymaster1OperationFactory(KM_PURPOSE_DECRYPT, engine)),
+      sign_factory_(new (std::nothrow) RsaKeymaster1OperationFactory(KM_PURPOSE_SIGN, engine)),
+      decrypt_factory_(new (std::nothrow)
+                           RsaKeymaster1OperationFactory(KM_PURPOSE_DECRYPT, engine)),
       // For pubkey ops we can use the normal operation factories.
-      verify_factory_(new RsaVerificationOperationFactory),
-      encrypt_factory_(new RsaEncryptionOperationFactory) {}
+      verify_factory_(new (std::nothrow) RsaVerificationOperationFactory),
+      encrypt_factory_(new (std::nothrow) RsaEncryptionOperationFactory) {}
 
 static bool is_supported(uint32_t digest) {
     return digest == KM_DIGEST_NONE || digest == KM_DIGEST_SHA_2_256;
@@ -120,10 +123,11 @@ keymaster_error_t RsaKeymaster1KeyFactory::LoadKey(KeymasterKeyBlob&& key_materi
     if (!rsa.get()) return error;
 
     key->reset(new (std::nothrow)
-                   RsaKeymaster1Key(rsa.release(), move(hw_enforced), move(sw_enforced), this));
+                   RsaKeymaster1Key(rsa.release(), std::move(hw_enforced), std::move(sw_enforced),
+                                    this));
     if (!(*key)) return KM_ERROR_MEMORY_ALLOCATION_FAILED;
 
-    (*key)->key_material() = move(key_material);
+    (*key)->key_material() = std::move(key_material);
     return KM_ERROR_OK;
 }
 
