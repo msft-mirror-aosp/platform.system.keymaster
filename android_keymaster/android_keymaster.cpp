@@ -364,7 +364,7 @@ void AndroidKeymaster::GenerateRkpKey(const GenerateRkpKeyRequest& request,
     if (response == nullptr) return;
 
     auto rem_prov_ctx = context_->GetRemoteProvisioningContext();
-    if (rem_prov_ctx == nullptr) {
+    if (!rem_prov_ctx) {
         response->error = static_cast<keymaster_error_t>(kStatusFailed);
         return;
     }
@@ -425,7 +425,7 @@ void AndroidKeymaster::GenerateCsr(const GenerateCsrRequest& request,
     if (response == nullptr) return;
 
     auto rem_prov_ctx = context_->GetRemoteProvisioningContext();
-    if (rem_prov_ctx == nullptr) {
+    if (!rem_prov_ctx) {
         LOG_E("Couldn't get a pointer to the remote provisioning context, returned null.", 0);
         response->error = static_cast<keymaster_error_t>(kStatusFailed);
         return;
@@ -451,8 +451,8 @@ void AndroidKeymaster::GenerateCsr(const GenerateCsrRequest& request,
         return cppcose::generateHmacSha256(ephemeral_mac_key, input);
     };
 
-    auto pubKeysToSignMac =
-        generateCoseMac0Mac(ephemeral_mac_function, std::vector<uint8_t>{}, *pubKeysToSign);
+    auto pubKeysToSignMac = generateCoseMac0Mac(ephemeral_mac_function, std::vector<uint8_t>{},
+                                                pubKeysToSign->encode());
     if (!pubKeysToSignMac) {
         LOG_E("Failed to generate COSE_Mac0 over the public keys to sign.", 0);
         response->error = static_cast<keymaster_error_t>(kStatusFailed);
@@ -516,6 +516,40 @@ void AndroidKeymaster::GenerateCsr(const GenerateCsrRequest& request,
     }
     std::vector<uint8_t> payload = coseEncrypted->encode();
     response->protected_data_blob = KeymasterBlob(payload.data(), payload.size());
+    response->error = KM_ERROR_OK;
+}
+
+void AndroidKeymaster::GenerateCsrV2(const GenerateCsrV2Request& request,
+                                     GenerateCsrV2Response* response) {
+
+    if (response == nullptr) return;
+
+    auto rem_prov_ctx = context_->GetRemoteProvisioningContext();
+    if (rem_prov_ctx == nullptr) {
+        LOG_E("Couldn't get a pointer to the remote provisioning context, returned null.", 0);
+        response->error = static_cast<keymaster_error_t>(kStatusFailed);
+        return;
+    }
+
+    auto macFunction = getMacFunction(false /* test_mode */, rem_prov_ctx);
+    auto pubKeys = validateAndExtractPubkeys(false /* test_mode */, request.num_keys,
+                                             request.keys_to_sign_array, macFunction);
+    if (!pubKeys.isOk()) {
+        LOG_E("Failed to validate and extract the public keys for the CSR", 0);
+        response->error = static_cast<keymaster_error_t>(pubKeys.moveError());
+        return;
+    }
+
+    auto csr = rem_prov_ctx->BuildCsr(
+        std::vector(request.challenge.begin(), request.challenge.end()), std::move(*pubKeys));
+    if (!csr) {
+        LOG_E("Failed to build CSR", 0);
+        response->error = static_cast<keymaster_error_t>(kStatusFailed);
+        return;
+    }
+
+    auto csr_blob = csr->encode();
+    response->csr = KeymasterBlob(csr_blob.data(), csr_blob.size());
     response->error = KM_ERROR_OK;
 }
 
@@ -996,6 +1030,28 @@ GetRootOfTrustResponse AndroidKeymaster::GetRootOfTrust(const GetRootOfTrustRequ
                 .encode();
     }
 
+    return response;
+}
+
+GetHwInfoResponse AndroidKeymaster::GetHwInfo() {
+    GetHwInfoResponse response(message_version());
+
+    auto rem_prov_ctx = context_->GetRemoteProvisioningContext();
+    if (!rem_prov_ctx) {
+        LOG_E("Couldn't get a pointer to the remote provisioning context, returned null.", 0);
+        response.error = static_cast<keymaster_error_t>(kStatusFailed);
+        return response;
+    }
+
+    rem_prov_ctx->GetHwInfo(&response);
+    response.error = KM_ERROR_OK;
+    return response;
+}
+
+SetAttestationIdsResponse
+AndroidKeymaster::SetAttestationIds(const SetAttestationIdsRequest& request) {
+    SetAttestationIdsResponse response(message_version());
+    response.error = context_->SetAttestationIds(request);
     return response;
 }
 

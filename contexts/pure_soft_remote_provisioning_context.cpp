@@ -137,7 +137,6 @@ PureSoftRemoteProvisioningContext::GenerateBcc(bool testMode) const {
                        .add(CoseKey::KEY_TYPE, OCTET_KEY_PAIR)
                        .add(CoseKey::ALGORITHM, EDDSA)
                        .add(CoseKey::CURVE, ED25519)
-                       .add(CoseKey::KEY_OPS, VERIFY)
                        .add(CoseKey::PUBKEY_X, pubKey)
                        .canonicalize();
     auto sign1Payload = cppbor::Map()
@@ -191,6 +190,29 @@ PureSoftRemoteProvisioningContext::GenerateHmacSha256(const cppcose::bytevec& in
         return std::nullopt;
     }
     return *result;
+}
+
+void PureSoftRemoteProvisioningContext::GetHwInfo(GetHwInfoResponse* hwInfo) const {
+    hwInfo->version = 2;
+    hwInfo->rpcAuthorName = "Google";
+    hwInfo->supportedEekCurve = 2 /* CURVE_25519 */;
+    hwInfo->uniqueId = "default keymint";
+    hwInfo->supportedNumKeysInCsr = 20;
+}
+
+cppcose::ErrMsgOr<cppbor::Array>
+PureSoftRemoteProvisioningContext::BuildCsr(const std::vector<uint8_t>& challenge,
+                                            cppbor::Array keysToSign) const {
+    auto deviceInfo = std::move(*CreateDeviceInfo());
+    auto signedDataPayload =
+        cppbor::Array().add(std::move(deviceInfo)).add(challenge).add(std::move(keysToSign));
+    auto signedData = constructCoseSign1(devicePrivKey_, signedDataPayload.encode(), {} /* aad */);
+
+    return cppbor::Array()
+        .add(3 /* version */)
+        .add(cppbor::Map() /* UdsCerts */)
+        .add(std::move(*bcc_.clone()->asArray()) /* DiceCertChain */)
+        .add(std::move(*signedData) /* SignedData */);
 }
 
 void PureSoftRemoteProvisioningContext::SetSystemVersion(uint32_t os_version,
