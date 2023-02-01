@@ -16,6 +16,7 @@
 
 #include <keymaster/android_keymaster.h>
 
+#include <utility>
 #include <vector>
 
 #include <assert.h>
@@ -146,7 +147,7 @@ AndroidKeymaster::AndroidKeymaster(KeymasterContext* context, size_t operation_t
 AndroidKeymaster::~AndroidKeymaster() {}
 
 AndroidKeymaster::AndroidKeymaster(AndroidKeymaster&& other)
-    : context_(move(other.context_)), operation_table_(move(other.operation_table_)),
+    : context_(std::move(other.context_)), operation_table_(std::move(other.operation_table_)),
       message_version_(other.message_version_) {}
 
 // TODO(swillden): Unify support analysis.  Right now, we have per-keytype methods that determine if
@@ -350,7 +351,7 @@ void AndroidKeymaster::GenerateKey(const GenerateKeyRequest& request,
     response->enforced.Clear();
     response->unenforced.Clear();
     response->error = factory->GenerateKey(request.key_description,
-                                           move(attest_key),  //
+                                           std::move(attest_key),  //
                                            request.issuer_subject,
                                            &response->key_blob,  //
                                            &response->enforced,
@@ -363,7 +364,7 @@ void AndroidKeymaster::GenerateRkpKey(const GenerateRkpKeyRequest& request,
     if (response == nullptr) return;
 
     auto rem_prov_ctx = context_->GetRemoteProvisioningContext();
-    if (rem_prov_ctx == nullptr) {
+    if (!rem_prov_ctx) {
         response->error = static_cast<keymaster_error_t>(kStatusFailed);
         return;
     }
@@ -424,7 +425,7 @@ void AndroidKeymaster::GenerateCsr(const GenerateCsrRequest& request,
     if (response == nullptr) return;
 
     auto rem_prov_ctx = context_->GetRemoteProvisioningContext();
-    if (rem_prov_ctx == nullptr) {
+    if (!rem_prov_ctx) {
         LOG_E("Couldn't get a pointer to the remote provisioning context, returned null.", 0);
         response->error = static_cast<keymaster_error_t>(kStatusFailed);
         return;
@@ -450,8 +451,8 @@ void AndroidKeymaster::GenerateCsr(const GenerateCsrRequest& request,
         return cppcose::generateHmacSha256(ephemeral_mac_key, input);
     };
 
-    auto pubKeysToSignMac =
-        generateCoseMac0Mac(ephemeral_mac_function, std::vector<uint8_t>{}, *pubKeysToSign);
+    auto pubKeysToSignMac = generateCoseMac0Mac(ephemeral_mac_function, std::vector<uint8_t>{},
+                                                pubKeysToSign->encode());
     if (!pubKeysToSignMac) {
         LOG_E("Failed to generate COSE_Mac0 over the public keys to sign.", 0);
         response->error = static_cast<keymaster_error_t>(kStatusFailed);
@@ -459,7 +460,8 @@ void AndroidKeymaster::GenerateCsr(const GenerateCsrRequest& request,
     }
     response->keys_to_sign_mac = KeymasterBlob(pubKeysToSignMac->data(), pubKeysToSignMac->size());
 
-    std::unique_ptr<cppbor::Map> device_info_map = rem_prov_ctx->CreateDeviceInfo();
+    std::unique_ptr<cppbor::Map> device_info_map =
+        rem_prov_ctx->CreateDeviceInfo(2 /* csrVersion */);
     std::vector<uint8_t> device_info = device_info_map->encode();
     response->device_info_blob = KeymasterBlob(device_info.data(), device_info.size());
     auto protectedDataPayload = rem_prov_ctx->BuildProtectedDataPayload(
@@ -518,6 +520,40 @@ void AndroidKeymaster::GenerateCsr(const GenerateCsrRequest& request,
     response->error = KM_ERROR_OK;
 }
 
+void AndroidKeymaster::GenerateCsrV2(const GenerateCsrV2Request& request,
+                                     GenerateCsrV2Response* response) {
+
+    if (response == nullptr) return;
+
+    auto rem_prov_ctx = context_->GetRemoteProvisioningContext();
+    if (rem_prov_ctx == nullptr) {
+        LOG_E("Couldn't get a pointer to the remote provisioning context, returned null.", 0);
+        response->error = static_cast<keymaster_error_t>(kStatusFailed);
+        return;
+    }
+
+    auto macFunction = getMacFunction(false /* test_mode */, rem_prov_ctx);
+    auto pubKeys = validateAndExtractPubkeys(false /* test_mode */, request.num_keys,
+                                             request.keys_to_sign_array, macFunction);
+    if (!pubKeys.isOk()) {
+        LOG_E("Failed to validate and extract the public keys for the CSR", 0);
+        response->error = static_cast<keymaster_error_t>(pubKeys.moveError());
+        return;
+    }
+
+    auto csr = rem_prov_ctx->BuildCsr(
+        std::vector(request.challenge.begin(), request.challenge.end()), std::move(*pubKeys));
+    if (!csr) {
+        LOG_E("Failed to build CSR", 0);
+        response->error = static_cast<keymaster_error_t>(kStatusFailed);
+        return;
+    }
+
+    auto csr_blob = csr->encode();
+    response->csr = KeymasterBlob(csr_blob.data(), csr_blob.size());
+    response->error = KM_ERROR_OK;
+}
+
 void AndroidKeymaster::GetKeyCharacteristics(const GetKeyCharacteristicsRequest& request,
                                              GetKeyCharacteristicsResponse* response) {
     if (response == nullptr) return;
@@ -528,8 +564,8 @@ void AndroidKeymaster::GetKeyCharacteristics(const GetKeyCharacteristicsRequest&
     if (response->error != KM_ERROR_OK) return;
 
     // scavenge the key object for the auth lists
-    response->enforced = move(key->hw_enforced());
-    response->unenforced = move(key->sw_enforced());
+    response->enforced = std::move(key->hw_enforced());
+    response->unenforced = std::move(key->sw_enforced());
 
     response->error = CheckVersionInfo(response->enforced, response->unenforced, *context_);
 }
@@ -553,7 +589,7 @@ void AndroidKeymaster::BeginOperation(const BeginOperationRequest& request,
     uint32_t sd_slot = key->secure_deletion_slot();
 
     OperationPtr operation(
-        factory->CreateOperation(move(*key), request.additional_params, &response->error));
+        factory->CreateOperation(std::move(*key), request.additional_params, &response->error));
     if (operation.get() == nullptr) return;
 
     operation->set_secure_deletion_slot(sd_slot);
@@ -581,7 +617,7 @@ void AndroidKeymaster::BeginOperation(const BeginOperationRequest& request,
     if (response->error != KM_ERROR_OK) return;
 
     response->op_handle = operation->operation_handle();
-    response->error = operation_table_->Add(move(operation));
+    response->error = operation_table_->Add(std::move(operation));
 }
 
 void AndroidKeymaster::UpdateOperation(const UpdateOperationRequest& request,
@@ -799,7 +835,7 @@ void AndroidKeymaster::ImportKey(const ImportKeyRequest& request, ImportKeyRespo
     response->error = factory->ImportKey(request.key_description,  //
                                          request.key_format,       //
                                          request.key_data,         //
-                                         move(attest_key),         //
+                                         std::move(attest_key),    //
                                          request.issuer_subject,   //
                                          &response->key_blob,      //
                                          &response->enforced,      //
@@ -995,6 +1031,28 @@ GetRootOfTrustResponse AndroidKeymaster::GetRootOfTrust(const GetRootOfTrustRequ
                 .encode();
     }
 
+    return response;
+}
+
+GetHwInfoResponse AndroidKeymaster::GetHwInfo() {
+    GetHwInfoResponse response(message_version());
+
+    auto rem_prov_ctx = context_->GetRemoteProvisioningContext();
+    if (!rem_prov_ctx) {
+        LOG_E("Couldn't get a pointer to the remote provisioning context, returned null.", 0);
+        response.error = static_cast<keymaster_error_t>(kStatusFailed);
+        return response;
+    }
+
+    rem_prov_ctx->GetHwInfo(&response);
+    response.error = KM_ERROR_OK;
+    return response;
+}
+
+SetAttestationIdsResponse
+AndroidKeymaster::SetAttestationIds(const SetAttestationIdsRequest& request) {
+    SetAttestationIdsResponse response(message_version());
+    response.error = context_->SetAttestationIds(request);
     return response;
 }
 
