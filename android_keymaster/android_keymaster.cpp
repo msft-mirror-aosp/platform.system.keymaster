@@ -141,7 +141,7 @@ constexpr int kRoTVersion1 = 40001;
 
 AndroidKeymaster::AndroidKeymaster(KeymasterContext* context, size_t operation_table_size,
                                    int32_t message_version)
-    : context_(context), operation_table_(new (std::nothrow) OperationTable(operation_table_size)),
+    : context_(context), operation_table_(new(std::nothrow) OperationTable(operation_table_size)),
       message_version_(message_version) {}
 
 AndroidKeymaster::~AndroidKeymaster() {}
@@ -460,7 +460,8 @@ void AndroidKeymaster::GenerateCsr(const GenerateCsrRequest& request,
     }
     response->keys_to_sign_mac = KeymasterBlob(pubKeysToSignMac->data(), pubKeysToSignMac->size());
 
-    std::unique_ptr<cppbor::Map> device_info_map = rem_prov_ctx->CreateDeviceInfo();
+    std::unique_ptr<cppbor::Map> device_info_map =
+        rem_prov_ctx->CreateDeviceInfo(2 /* csrVersion */);
     std::vector<uint8_t> device_info = device_info_map->encode();
     response->device_info_blob = KeymasterBlob(device_info.data(), device_info.size());
     auto protectedDataPayload = rem_prov_ctx->BuildProtectedDataPayload(
@@ -1052,6 +1053,13 @@ SetAttestationIdsResponse
 AndroidKeymaster::SetAttestationIds(const SetAttestationIdsRequest& request) {
     SetAttestationIdsResponse response(message_version());
     response.error = context_->SetAttestationIds(request);
+    return response;
+}
+
+SetAttestationIdsKM3Response
+AndroidKeymaster::SetAttestationIdsKM3(const SetAttestationIdsKM3Request& request) {
+    SetAttestationIdsKM3Response response(message_version());
+    response.error = context_->SetAttestationIdsKM3(request);
     return response;
 }
 
