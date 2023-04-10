@@ -134,6 +134,7 @@ std::pair<const uint8_t*, size_t> blob2Pair(const keymaster_blob_t& blob) {
     return {blob.data, blob.data_length};
 }
 
+constexpr int kMaxChallengeSizeV2 = 64;
 constexpr int kP256AffinePointSize = 32;
 constexpr int kRoTVersion1 = 40001;
 
@@ -141,7 +142,7 @@ constexpr int kRoTVersion1 = 40001;
 
 AndroidKeymaster::AndroidKeymaster(KeymasterContext* context, size_t operation_table_size,
                                    int32_t message_version)
-    : context_(context), operation_table_(new (std::nothrow) OperationTable(operation_table_size)),
+    : context_(context), operation_table_(new(std::nothrow) OperationTable(operation_table_size)),
       message_version_(message_version) {}
 
 AndroidKeymaster::~AndroidKeymaster() {}
@@ -359,6 +360,8 @@ void AndroidKeymaster::GenerateKey(const GenerateKeyRequest& request,
                                            &response->certificate_chain);
 }
 
+constexpr int kRkpVersionWithoutSuperencryption = 3;
+
 void AndroidKeymaster::GenerateRkpKey(const GenerateRkpKeyRequest& request,
                                       GenerateRkpKeyResponse* response) {
     if (response == nullptr) return;
@@ -368,6 +371,11 @@ void AndroidKeymaster::GenerateRkpKey(const GenerateRkpKeyRequest& request,
         response->error = static_cast<keymaster_error_t>(kStatusFailed);
         return;
     }
+
+    GetHwInfoResponse hwInfo(message_version());
+    rem_prov_ctx->GetHwInfo(&hwInfo);
+    bool test_mode =
+        (hwInfo.version >= kRkpVersionWithoutSuperencryption) ? false : request.test_mode;
 
     // Generate the keypair that will become the attestation key.
     GenerateKeyRequest gen_key_request(message_version_);
@@ -402,13 +410,13 @@ void AndroidKeymaster::GenerateRkpKey(const GenerateRkpKeyRequest& request,
                                           .add(CoseKey::CURVE, P256)
                                           .add(CoseKey::PUBKEY_X, x_coord)
                                           .add(CoseKey::PUBKEY_Y, y_coord);
-    if (request.test_mode) {
+    if (test_mode) {
         cose_public_key_map.add(CoseKey::TEST_KEY, cppbor::Null());
     }
 
     std::vector<uint8_t> cosePublicKey = cose_public_key_map.canonicalize().encode();
 
-    auto macFunction = getMacFunction(request.test_mode, rem_prov_ctx);
+    auto macFunction = getMacFunction(test_mode, rem_prov_ctx);
     auto macedKey = constructCoseMac0(macFunction, {} /* externalAad */, cosePublicKey);
     if (!macedKey) {
         response->error = static_cast<keymaster_error_t>(kStatusFailed);
@@ -428,6 +436,13 @@ void AndroidKeymaster::GenerateCsr(const GenerateCsrRequest& request,
     if (!rem_prov_ctx) {
         LOG_E("Couldn't get a pointer to the remote provisioning context, returned null.", 0);
         response->error = static_cast<keymaster_error_t>(kStatusFailed);
+        return;
+    }
+
+    GetHwInfoResponse hwInfo(message_version());
+    rem_prov_ctx->GetHwInfo(&hwInfo);
+    if (hwInfo.version >= kRkpVersionWithoutSuperencryption) {
+        response->error = static_cast<keymaster_error_t>(kStatusRemoved);
         return;
     }
 
@@ -524,6 +539,14 @@ void AndroidKeymaster::GenerateCsrV2(const GenerateCsrV2Request& request,
                                      GenerateCsrV2Response* response) {
 
     if (response == nullptr) return;
+
+    if (request.challenge.size() > kMaxChallengeSizeV2) {
+        LOG_E("Challenge is too large. %zu expected. %zu actual.",
+              kMaxChallengeSizeV2,        //
+              request.challenge.size());  //
+        response->error = static_cast<keymaster_error_t>(kStatusFailed);
+        return;
+    }
 
     auto rem_prov_ctx = context_->GetRemoteProvisioningContext();
     if (rem_prov_ctx == nullptr) {
@@ -1053,6 +1076,13 @@ SetAttestationIdsResponse
 AndroidKeymaster::SetAttestationIds(const SetAttestationIdsRequest& request) {
     SetAttestationIdsResponse response(message_version());
     response.error = context_->SetAttestationIds(request);
+    return response;
+}
+
+SetAttestationIdsKM3Response
+AndroidKeymaster::SetAttestationIdsKM3(const SetAttestationIdsKM3Request& request) {
+    SetAttestationIdsKM3Response response(message_version());
+    response.error = context_->SetAttestationIdsKM3(request);
     return response;
 }
 
