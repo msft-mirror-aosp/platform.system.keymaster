@@ -134,6 +134,7 @@ std::pair<const uint8_t*, size_t> blob2Pair(const keymaster_blob_t& blob) {
     return {blob.data, blob.data_length};
 }
 
+constexpr int kMaxChallengeSizeV2 = 64;
 constexpr int kP256AffinePointSize = 32;
 constexpr int kRoTVersion1 = 40001;
 
@@ -359,6 +360,8 @@ void AndroidKeymaster::GenerateKey(const GenerateKeyRequest& request,
                                            &response->certificate_chain);
 }
 
+constexpr int kRkpVersionWithoutSuperencryption = 3;
+
 void AndroidKeymaster::GenerateRkpKey(const GenerateRkpKeyRequest& request,
                                       GenerateRkpKeyResponse* response) {
     if (response == nullptr) return;
@@ -366,6 +369,13 @@ void AndroidKeymaster::GenerateRkpKey(const GenerateRkpKeyRequest& request,
     auto rem_prov_ctx = context_->GetRemoteProvisioningContext();
     if (!rem_prov_ctx) {
         response->error = static_cast<keymaster_error_t>(kStatusFailed);
+        return;
+    }
+
+    GetHwInfoResponse hwInfo(message_version());
+    rem_prov_ctx->GetHwInfo(&hwInfo);
+    if (hwInfo.version >= kRkpVersionWithoutSuperencryption && request.test_mode) {
+        response->error = static_cast<keymaster_error_t>(kStatusRemoved);
         return;
     }
 
@@ -428,6 +438,13 @@ void AndroidKeymaster::GenerateCsr(const GenerateCsrRequest& request,
     if (!rem_prov_ctx) {
         LOG_E("Couldn't get a pointer to the remote provisioning context, returned null.", 0);
         response->error = static_cast<keymaster_error_t>(kStatusFailed);
+        return;
+    }
+
+    GetHwInfoResponse hwInfo(message_version());
+    rem_prov_ctx->GetHwInfo(&hwInfo);
+    if (hwInfo.version >= kRkpVersionWithoutSuperencryption) {
+        response->error = static_cast<keymaster_error_t>(kStatusRemoved);
         return;
     }
 
@@ -524,6 +541,14 @@ void AndroidKeymaster::GenerateCsrV2(const GenerateCsrV2Request& request,
                                      GenerateCsrV2Response* response) {
 
     if (response == nullptr) return;
+
+    if (request.challenge.size() > kMaxChallengeSizeV2) {
+        LOG_E("Challenge is too large. %zu expected. %zu actual.",
+              kMaxChallengeSizeV2,        //
+              request.challenge.size());  //
+        response->error = static_cast<keymaster_error_t>(kStatusFailed);
+        return;
+    }
 
     auto rem_prov_ctx = context_->GetRemoteProvisioningContext();
     if (rem_prov_ctx == nullptr) {
