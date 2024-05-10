@@ -102,13 +102,13 @@ template <keymaster_tag_type_t tag_type, keymaster_tag_t tag> class TypedTag {
         // Ensure that it's impossible to create a TypedTag instance whose 'tag' doesn't have type
         // 'tag_type'.  Attempting to instantiate a tag with the wrong type will result in a compile
         // error (no match for template specialization StaticAssert<false>), with no run-time cost.
-        StaticAssert<(tag & tag_type) == tag_type>::check();
+        StaticAssert<(static_cast<keymaster_tag_type_t>(tag) & tag_type) == tag_type>::check();
         StaticAssert<(tag_type != KM_ENUM) && (tag_type != KM_ENUM_REP)>::check();
     }
     // NOLINTNEXTLINE(google-explicit-constructor)
     inline operator keymaster_tag_t() { return tag; }
     // NOLINTNEXTLINE(google-runtime-int)
-    inline long masked_tag() { return static_cast<long>(keymaster_tag_mask_type(tag)); }
+    inline int masked_tag() { return static_cast<int>(keymaster_tag_mask_type(tag)); }
 };
 
 template <keymaster_tag_type_t tag_type, keymaster_tag_t tag, typename KeymasterEnum>
@@ -120,13 +120,13 @@ class TypedEnumTag {
         // Ensure that it's impossible to create a TypedTag instance whose 'tag' doesn't have type
         // 'tag_type'.  Attempting to instantiate a tag with the wrong type will result in a compile
         // error (no match for template specialization StaticAssert<false>), with no run-time cost.
-        StaticAssert<(tag & tag_type) == tag_type>::check();
+        StaticAssert<(static_cast<keymaster_tag_type_t>(tag) & tag_type) == tag_type>::check();
         StaticAssert<(tag_type == KM_ENUM) || (tag_type == KM_ENUM_REP)>::check();
     }
     // NOLINTNEXTLINE(google-explicit-constructor)
     inline operator keymaster_tag_t() { return tag; }
     // NOLINTNEXTLINE(google-runtime-int)
-    inline long masked_tag() { return static_cast<long>(keymaster_tag_mask_type(tag)); }
+    inline int masked_tag() { return static_cast<int>(keymaster_tag_mask_type(tag)); }
 };
 
 #ifdef KEYMASTER_NAME_TAGS

@@ -205,7 +205,7 @@ typedef struct km_key_description {
     ASN1_OCTET_STRING* attestation_challenge;
     KM_AUTH_LIST* software_enforced;
     KM_AUTH_LIST* tee_enforced;
-    ASN1_INTEGER* unique_id;
+    ASN1_OCTET_STRING* unique_id;
 } KM_KEY_DESCRIPTION;
 
 ASN1_SEQUENCE(KM_KEY_DESCRIPTION) = {
@@ -350,13 +350,14 @@ keymaster_error_t build_eat_record(const AuthorizationSet& attestation_params,
                                    std::vector<uint8_t>* eat_token);
 
 // Builds the input to HMAC-SHA256 for unique ID generation.
-std::vector<uint8_t> build_unique_id_input(uint64_t creation_date_time,
-                                           const keymaster_blob_t& application_id,
-                                           bool reset_since_rotation);
+keymaster_error_t build_unique_id_input(uint64_t creation_date_time,
+                                        const keymaster_blob_t& application_id,
+                                        bool reset_since_rotation, Buffer* input_data);
 
 // Builds a unique ID of size UNIQUE_ID_SIZE from the given inputs.
-Buffer generate_unique_id(const std::vector<uint8_t>& hbk, uint64_t creation_date_time,
-                          const keymaster_blob_t& application_id, bool reset_since_rotation);
+keymaster_error_t generate_unique_id(const std::vector<uint8_t>& hbk, uint64_t creation_date_time,
+                                     const keymaster_blob_t& application_id,
+                                     bool reset_since_rotation, Buffer* unique_id);
 
 /**
  * Helper functions for attestation record tests. Caller takes ownership of

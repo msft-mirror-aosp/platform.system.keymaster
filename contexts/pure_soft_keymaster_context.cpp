@@ -341,12 +341,12 @@ keymaster_error_t PureSoftKeymasterContext::ParseKeyBlob(const KeymasterKeyBlob&
 
     // Wasn't an integrity-assured blob.  Maybe it's an auth-encrypted blob.
     error = ParseAuthEncryptedBlob(blob, hidden, &key_material, &hw_enforced, &sw_enforced);
-    if (error == KM_ERROR_OK) LOG_D("Parsed an old keymaster1 software key", 0);
+    if (error == KM_ERROR_OK) LOG_D("Parsed an old keymaster1 software key");
     if (error != KM_ERROR_INVALID_KEY_BLOB) return constructKey();
 
     // Wasn't an auth-encrypted blob.  Maybe it's an old softkeymaster blob.
     error = ParseOldSoftkeymasterBlob(blob, &key_material, &hw_enforced, &sw_enforced);
-    if (error == KM_ERROR_OK) LOG_D("Parsed an old sofkeymaster key", 0);
+    if (error == KM_ERROR_OK) LOG_D("Parsed an old sofkeymaster key");
 
     return constructKey();
 }
@@ -454,8 +454,10 @@ keymaster::Buffer PureSoftKeymasterContext::GenerateUniqueId(uint64_t creation_d
     // The secret must contain at least 128 bits of entropy and be unique to the individual device"
     const std::vector<uint8_t> fake_hbk = {'M', 'u', 's', 't', 'B', 'e', 'R', 'a',
                                            'n', 'd', 'o', 'm', 'B', 'i', 't', 's'};
-    return keymaster::generate_unique_id(fake_hbk, creation_date_time, application_id,
-                                         reset_since_rotation);
+    Buffer unique_id;
+    *error = keymaster::generate_unique_id(fake_hbk, creation_date_time, application_id,
+                                           reset_since_rotation, &unique_id);
+    return unique_id;
 }
 
 static keymaster_error_t TranslateAuthorizationSetError(AuthorizationSet::Error err) {
