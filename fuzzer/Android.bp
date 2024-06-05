@@ -16,6 +16,7 @@
  */
 
 package {
+    default_team: "trendy_team_android_hardware_backed_security",
     // See: http://go/android-license-faq
     // A large-scale-change added 'default_applicable_licenses' to import
     // all of the 'license_kinds' from "system_keymaster_license"
@@ -69,15 +70,5 @@ cc_fuzz {
     ],
     srcs: [
         "k4_AndroidKeymaster4Device_fuzzer.cpp",
-    ],
-}
-
-cc_fuzz {
-    name: "k4_keymaster_configuration_fuzzer",
-    defaults: [
-        "libkeymaster4_fuzzer_defaults",
-    ],
-    srcs: [
-        "k4_keymaster_configuration_fuzzer.cpp",
     ],
 }
