@@ -68,7 +68,7 @@ keymaster_error_t CheckPatchLevel(const AuthorizationSet& tee_enforced,
         if (key_patchlevel < current_patchlevel) {
             return KM_ERROR_KEY_REQUIRES_UPGRADE;
         } else if (key_patchlevel > current_patchlevel) {
-            LOG_E("Key blob invalid! key patchlevel %lu is > current patchlevel %lu",
+            LOG_E("Key blob invalid! key patchlevel %lux is > current patchlevel %lux",
                   (unsigned long)key_patchlevel, (unsigned long)current_patchlevel);
             return KM_ERROR_INVALID_KEY_BLOB;
         }
@@ -186,8 +186,8 @@ GetVersion2Response AndroidKeymaster::GetVersion2(const GetVersion2Request& req)
     // Determine what message version we should use.
     message_version_ = NegotiateMessageVersion(req, rsp);
 
-    LOG_D("GetVersion2 results: %d, %d, %d, %d", rsp.km_version, rsp.km_date,
-          rsp.max_message_version, message_version_);
+    LOG_D("GetVersion2 results: %d, %d, %d, %d", static_cast<int>(rsp.km_version),
+          rsp.km_date, rsp.max_message_version, message_version_);
     return rsp;
 }
 
