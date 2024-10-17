@@ -499,3 +499,9 @@ cc_fuzz {
         "tests/fuzzers/message_serializable_fuzz.cpp",
     ],
 }
+
+dirgroup {
+    name: "trusty_dirgroup_system_keymaster",
+    dirs: ["."],
+    visibility: ["//trusty/vendor/google/aosp/scripts"],
+}
