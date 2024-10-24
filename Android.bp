@@ -437,6 +437,46 @@ cc_library {
 }
 
 cc_library {
+    name: "lib_android_keymaster_keymint_utils_V3",
+    vendor_available: true,
+    srcs: [
+        "ng/KeyMintUtils.cpp",
+    ],
+    defaults: [
+        "keymaster_defaults",
+    ],
+    shared_libs: [
+        "android.hardware.security.keymint-V3-ndk",
+        "libbase",
+        "libhardware",
+    ],
+    export_include_dirs: [
+        "ng/include",
+        "include",
+    ],
+}
+
+cc_library {
+    name: "lib_android_keymaster_keymint_utils_V2",
+    vendor_available: true,
+    srcs: [
+        "ng/KeyMintUtils.cpp",
+    ],
+    defaults: [
+        "keymaster_defaults",
+    ],
+    shared_libs: [
+        "android.hardware.security.keymint-V2-ndk",
+        "libbase",
+        "libhardware",
+    ],
+    export_include_dirs: [
+        "ng/include",
+        "include",
+    ],
+}
+
+cc_library {
     name: "libcppcose_rkp",
     vendor_available: true,
     host_supported: true,
@@ -498,4 +538,10 @@ cc_fuzz {
     srcs: [
         "tests/fuzzers/message_serializable_fuzz.cpp",
     ],
+}
+
+dirgroup {
+    name: "trusty_dirgroup_system_keymaster",
+    dirs: ["."],
+    visibility: ["//trusty/vendor/google/aosp/scripts"],
 }
