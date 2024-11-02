@@ -137,6 +137,7 @@ inline int32_t MessageVersion(KmVersion version, uint32_t /* km_date */ = 0) {
     case KmVersion::KEYMINT_1:
     case KmVersion::KEYMINT_2:
     case KmVersion::KEYMINT_3:
+    case KmVersion::KEYMINT_4:
         return 4;
     }
     return kInvalidMessageVersion;
