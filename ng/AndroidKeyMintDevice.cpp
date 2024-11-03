@@ -215,9 +215,9 @@ constexpr size_t kOperationTableSize = 16;
 
 AndroidKeyMintDevice::AndroidKeyMintDevice(SecurityLevel securityLevel)
     : impl_(new(std::nothrow)::keymaster::AndroidKeymaster(
-          [&]() -> auto{
+          [&]() -> auto {
               auto context = new (std::nothrow) PureSoftKeymasterContext(
-                  KmVersion::KEYMINT_3, static_cast<keymaster_security_level_t>(securityLevel));
+                  KmVersion::KEYMINT_4, static_cast<keymaster_security_level_t>(securityLevel));
               context->SetSystemVersion(::keymaster::GetOsVersion(),
                                         ::keymaster::GetOsPatchlevel());
               context->SetVendorPatchlevel(::keymaster::GetVendorPatchlevel());
@@ -242,7 +242,7 @@ AndroidKeyMintDevice::AndroidKeyMintDevice(SecurityLevel securityLevel)
 AndroidKeyMintDevice::~AndroidKeyMintDevice() {}
 
 ScopedAStatus AndroidKeyMintDevice::getHardwareInfo(KeyMintHardwareInfo* info) {
-    info->versionNumber = 3;
+    info->versionNumber = 4;
     info->securityLevel = securityLevel_;
     info->keyMintName = "FakeKeyMintDevice";
     info->keyMintAuthorName = "Google";
@@ -490,6 +490,11 @@ ScopedAStatus AndroidKeyMintDevice::getRootOfTrust(const array<uint8_t, 16>& /* 
 }
 
 ScopedAStatus AndroidKeyMintDevice::sendRootOfTrust(const vector<uint8_t>& /* rootOfTrust */) {
+    return kmError2ScopedAStatus(KM_ERROR_UNIMPLEMENTED);
+}
+
+ScopedAStatus AndroidKeyMintDevice::setAdditionalAttestationInfo(
+    const vector<KeyParameter>& /* additionalAttestationInfo */) {
     return kmError2ScopedAStatus(KM_ERROR_UNIMPLEMENTED);
 }
 
