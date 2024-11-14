@@ -128,6 +128,7 @@ vector<KeyCharacteristics> convertKeyCharacteristics(SecurityLevel keyMintSecuri
         case KM_TAG_RESET_SINCE_ID_ROTATION:
         case KM_TAG_ROOT_OF_TRUST:
         case KM_TAG_UNIQUE_ID:
+        case KM_TAG_MODULE_HASH:
             break;
 
         /* KeyMint-enforced */
@@ -493,9 +494,17 @@ ScopedAStatus AndroidKeyMintDevice::sendRootOfTrust(const vector<uint8_t>& /* ro
     return kmError2ScopedAStatus(KM_ERROR_UNIMPLEMENTED);
 }
 
-ScopedAStatus AndroidKeyMintDevice::setAdditionalAttestationInfo(
-    const vector<KeyParameter>& /* additionalAttestationInfo */) {
-    return kmError2ScopedAStatus(KM_ERROR_UNIMPLEMENTED);
+ScopedAStatus AndroidKeyMintDevice::setAdditionalAttestationInfo(const vector<KeyParameter>& info) {
+    SetAdditionalAttestationInfoRequest request(impl_->message_version());
+    request.info.Reinitialize(KmParamSet(info));
+
+    SetAdditionalAttestationInfoResponse response = impl_->SetAdditionalAttestationInfo(request);
+
+    if (response.error != KM_ERROR_OK) {
+        return kmError2ScopedAStatus(response.error);
+    } else {
+        return ScopedAStatus::ok();
+    }
 }
 
 std::shared_ptr<IKeyMintDevice> CreateKeyMintDevice(SecurityLevel securityLevel) {

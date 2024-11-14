@@ -122,6 +122,7 @@ typedef struct km_auth_list {
     ASN1_NULL* device_unique_attestation;
     ASN1_NULL* identity_credential_key;
     ASN1_OCTET_STRING* attestation_id_second_imei;
+    ASN1_OCTET_STRING* module_hash;
 } KM_AUTH_LIST;
 
 ASN1_SEQUENCE(KM_AUTH_LIST) = {
@@ -194,6 +195,7 @@ ASN1_SEQUENCE(KM_AUTH_LIST) = {
                  TAG_IDENTITY_CREDENTIAL_KEY.masked_tag()),
     ASN1_EXP_OPT(KM_AUTH_LIST, attestation_id_second_imei, ASN1_OCTET_STRING,
                  TAG_ATTESTATION_ID_SECOND_IMEI.masked_tag()),
+    ASN1_EXP_OPT(KM_AUTH_LIST, module_hash, ASN1_OCTET_STRING, TAG_MODULE_HASH.masked_tag()),
 } ASN1_SEQUENCE_END(KM_AUTH_LIST);
 DECLARE_ASN1_FUNCTIONS(KM_AUTH_LIST);
 
