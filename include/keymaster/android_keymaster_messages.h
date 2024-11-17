@@ -74,6 +74,7 @@ enum AndroidKeymasterCommand : uint32_t {
     GENERATE_CSR_V2 = 37,
     SET_ATTESTATION_IDS = 38,
     SET_ATTESTATION_IDS_KM3 = 39,
+    SET_ADDITIONAL_ATTESTATION_INFO = 40,
 };
 
 /**
@@ -1215,6 +1216,23 @@ struct SetAttestationIdsKM3Request : public KeymasterMessage {
 };
 
 using SetAttestationIdsKM3Response = EmptyKeymasterResponse;
+
+struct SetAdditionalAttestationInfoRequest : public KeymasterMessage {
+    explicit SetAdditionalAttestationInfoRequest(int32_t ver) : KeymasterMessage(ver) {}
+    size_t SerializedSize() const override { return info.SerializedSize(); }
+
+    uint8_t* Serialize(uint8_t* buf, const uint8_t* end) const override {
+        return info.Serialize(buf, end);
+    }
+
+    bool Deserialize(const uint8_t** buf_ptr, const uint8_t* end) override {
+        return info.Deserialize(buf_ptr, end);
+    }
+
+    AuthorizationSet info;
+};
+
+using SetAdditionalAttestationInfoResponse = EmptyKeymasterResponse;
 
 struct ConfigureVendorPatchlevelRequest : public KeymasterMessage {
     explicit ConfigureVendorPatchlevelRequest(int32_t ver) : KeymasterMessage(ver) {}
