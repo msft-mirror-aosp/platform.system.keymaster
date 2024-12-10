@@ -261,10 +261,6 @@ keymaster_error_t PureSoftKeymasterContext::CreateKeyBlob(const AuthorizationSet
     error =
         ExtendKeyBlobAuthorizations(hw_enforced, sw_enforced, vendor_patchlevel_, boot_patchlevel_);
     if (error != KM_ERROR_OK) return error;
-    if (module_hash_.has_value()) {
-        keymaster_blob_t mod_hash = {module_hash_.value().data(), module_hash_.value().size()};
-        sw_enforced->push_back(TAG_MODULE_HASH, mod_hash);
-    }
 
     AuthorizationSet hidden;
     error = BuildHiddenAuthorizations(key_description, &hidden, softwareRootOfTrust);
