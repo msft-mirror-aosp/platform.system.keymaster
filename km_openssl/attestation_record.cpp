@@ -1057,6 +1057,15 @@ keymaster_error_t build_attestation_record(const AuthorizationSet& attestation_p
     }
     sw_enforced.push_back(TAG_ATTESTATION_APPLICATION_ID, attestation_app_id);
 
+    auto module_hash = context.GetModuleHash();
+    if (module_hash.has_value()) {
+        // If the attestation context provides a module hash value, include it in the
+        // software-enforced part of the extension (because it will not be included as a key
+        // characteristic).
+        keymaster_blob_t mod_hash = {module_hash.value().data(), module_hash.value().size()};
+        sw_enforced.push_back(TAG_MODULE_HASH, mod_hash);
+    }
+
     error = context.VerifyAndCopyDeviceIds(
         attestation_params,
         context.GetSecurityLevel() == KM_SECURITY_LEVEL_SOFTWARE ? &sw_enforced : &tee_enforced);
