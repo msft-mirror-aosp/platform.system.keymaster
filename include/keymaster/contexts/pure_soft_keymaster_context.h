@@ -109,6 +109,13 @@ class PureSoftKeymasterContext : public KeymasterContext,
     keymaster_error_t SetModuleHash(const keymaster_blob_t& module_hash) override;
 
     /*********************************************************************************************
+     * Implement AttestationContext
+     */
+    virtual std::optional<std::vector<uint8_t>> GetModuleHash() const override {
+        return module_hash_;
+    }
+
+    /*********************************************************************************************
      * Implement SoftwareKeyBlobMaker
      */
     keymaster_error_t CreateKeyBlob(const AuthorizationSet& auths, keymaster_key_origin_t origin,
