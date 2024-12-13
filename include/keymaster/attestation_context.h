@@ -16,6 +16,9 @@
 
 #pragma once
 
+#include <optional>
+#include <vector>
+
 #include <keymaster/authorization_set.h>
 #include <keymaster/km_version.h>
 
@@ -97,6 +100,11 @@ class AttestationContext {
      */
     virtual CertificateChain GetAttestationChain(keymaster_algorithm_t algorithm,
                                                  keymaster_error_t* error) const = 0;
+
+    /**
+     * Return the current module hash value to be included in the attestation extension.
+     */
+    virtual std::optional<std::vector<uint8_t>> GetModuleHash() const { return std::nullopt; }
 
   protected:
     KmVersion version_;
