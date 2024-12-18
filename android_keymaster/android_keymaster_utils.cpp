@@ -27,7 +27,7 @@ const size_t kMaxDupBufferSize = 16 * 1024 * 1024;
 uint8_t* dup_buffer(const void* buf, size_t size) {
     if (size >= kMaxDupBufferSize) return nullptr;
     uint8_t* retval = new (std::nothrow) uint8_t[size];
-    if (retval) memcpy(retval, buf, size);
+    if (retval && buf) memcpy(retval, buf, size);
     return retval;
 }
 
