@@ -692,6 +692,9 @@ keymaster_error_t build_auth_list(const AuthorizationSet& auth_list, KM_AUTH_LIS
         case KM_TAG_ATTESTATION_ID_MODEL:
             string_ptr = &record->attestation_id_model;
             break;
+        case KM_TAG_MODULE_HASH:
+            string_ptr = &record->module_hash;
+            break;
         }
 
         keymaster_tag_type_t type = keymaster_tag_get_type(entry.tag);
@@ -1054,6 +1057,15 @@ keymaster_error_t build_attestation_record(const AuthorizationSet& attestation_p
     }
     sw_enforced.push_back(TAG_ATTESTATION_APPLICATION_ID, attestation_app_id);
 
+    auto module_hash = context.GetModuleHash();
+    if (module_hash.has_value()) {
+        // If the attestation context provides a module hash value, include it in the
+        // software-enforced part of the extension (because it will not be included as a key
+        // characteristic).
+        keymaster_blob_t mod_hash = {module_hash.value().data(), module_hash.value().size()};
+        sw_enforced.push_back(TAG_MODULE_HASH, mod_hash);
+    }
+
     error = context.VerifyAndCopyDeviceIds(
         attestation_params,
         context.GetSecurityLevel() == KM_SECURITY_LEVEL_SOFTWARE ? &sw_enforced : &tee_enforced);
@@ -1411,6 +1423,12 @@ keymaster_error_t extract_auth_list(const KM_AUTH_LIST* record, AuthorizationSet
         !auth_list->push_back(TAG_ATTESTATION_ID_SECOND_IMEI,
                               record->attestation_id_second_imei->data,
                               record->attestation_id_second_imei->length)) {
+        return KM_ERROR_MEMORY_ALLOCATION_FAILED;
+    }
+
+    // Module hash
+    if (record->module_hash && !auth_list->push_back(TAG_MODULE_HASH, record->module_hash->data,
+                                                     record->module_hash->length)) {
         return KM_ERROR_MEMORY_ALLOCATION_FAILED;
     }
 
