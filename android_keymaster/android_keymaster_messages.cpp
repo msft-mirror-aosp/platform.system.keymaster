@@ -704,18 +704,23 @@ size_t GetVersionResponse::NonErrorSerializedSize() const {
 }
 
 uint8_t* GetVersionResponse::NonErrorSerialize(uint8_t* buf, const uint8_t* end) const {
-    if (buf + NonErrorSerializedSize() <= end) {
-        *buf++ = major_ver;
-        *buf++ = minor_ver;
-        *buf++ = subminor_ver;
-    } else {
-        buf += NonErrorSerializedSize();
+    ptrdiff_t buf_size = end - buf;
+    if (buf_size < static_cast<ptrdiff_t>(NonErrorSerializedSize())) {
+        // Not enough space in buffer; return pointer to the end of buffer.
+        return buf + buf_size;
     }
+
+    *buf++ = major_ver;
+    *buf++ = minor_ver;
+    *buf++ = subminor_ver;
+
     return buf;
 }
 
 bool GetVersionResponse::NonErrorDeserialize(const uint8_t** buf_ptr, const uint8_t* end) {
-    if (*buf_ptr + NonErrorSerializedSize() > end) return false;
+    if (!(*buf_ptr) || ((end - *buf_ptr) < static_cast<ptrdiff_t>(NonErrorSerializedSize()))) {
+        return false;
+    }
     const uint8_t* tmp = *buf_ptr;
     major_ver = *tmp++;
     minor_ver = *tmp++;
