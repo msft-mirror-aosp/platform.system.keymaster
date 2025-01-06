@@ -90,6 +90,7 @@ bool Buffer::Reinitialize(size_t size) {
     Clear();
     buffer_.reset(new (std::nothrow) uint8_t[size]);
     if (!buffer_.get()) return false;
+
     buffer_size_ = size;
     read_position_ = 0;
     write_position_ = 0;
@@ -98,12 +99,19 @@ bool Buffer::Reinitialize(size_t size) {
 
 bool Buffer::Reinitialize(const void* data, size_t data_len) {
     Clear();
-    if (__pval(data) + data_len < __pval(data))  // Pointer wrap check
+    uintptr_t data_end;
+    // Check for pointer overflow
+    if (__builtin_add_overflow(__pval(data), data_len, &data_end)) {
         return false;
+    }
+
     buffer_.reset(new (std::nothrow) uint8_t[data_len]);
     if (!buffer_.get()) return false;
+    if (data_len) {
+        memcpy(buffer_.get(), data, data_len);
+    }
+
     buffer_size_ = data_len;
-    memcpy(buffer_.get(), data, data_len);
     read_position_ = 0;
     write_position_ = buffer_size_;
     return true;

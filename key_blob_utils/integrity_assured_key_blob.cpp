@@ -102,7 +102,7 @@ keymaster_error_t DeserializeIntegrityAssuredBlob(const KeymasterKeyBlob& key_bl
     const uint8_t* p = key_blob.begin();
     const uint8_t* end = key_blob.end();
 
-    if (p > end || p + HMAC_SIZE > end) return KM_ERROR_INVALID_KEY_BLOB;
+    if (p > end || end - p < HMAC_SIZE) return KM_ERROR_INVALID_KEY_BLOB;
 
     uint8_t computed_hmac[HMAC_SIZE];
     keymaster_error_t error = ComputeHmac(key_blob.begin(), key_blob.key_material_size - HMAC_SIZE,
@@ -121,9 +121,10 @@ keymaster_error_t DeserializeIntegrityAssuredBlob_NoHmacCheck(const KeymasterKey
                                                               AuthorizationSet* hw_enforced,
                                                               AuthorizationSet* sw_enforced) {
     const uint8_t* p = key_blob.begin();
-    const uint8_t* end = key_blob.end() - HMAC_SIZE;
+    const uint8_t* end = key_blob.end();
 
-    if (p > end) return KM_ERROR_INVALID_KEY_BLOB;
+    if (p > end || end - p < HMAC_SIZE) return KM_ERROR_INVALID_KEY_BLOB;
+    end -= HMAC_SIZE;
 
     if (*p != BLOB_VERSION) return KM_ERROR_INVALID_KEY_BLOB;
     ++p;

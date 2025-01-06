@@ -99,6 +99,8 @@ template <typename T> class ErrMsgOr {
         : errMsg_(std::move(errMsg)) {}
     ErrMsgOr(const char* errMsg)  // NOLINT(google-explicit-constructor)
         : errMsg_(errMsg) {}
+    ErrMsgOr(std::string_view errMsg)  // NOLINT(google-explicit-constructor)
+        : errMsg_(errMsg) {}
     ErrMsgOr(T val)  // NOLINT(google-explicit-constructor)
         : value_(std::move(val)) {}
 
