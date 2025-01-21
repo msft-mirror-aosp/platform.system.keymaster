@@ -18,12 +18,12 @@
 
 #include <hardware/keymaster_defs.h>
 #include <keymaster/authorization_set.h>
+#include <keymaster/operation.h>
 
 namespace keymaster {
 
 class Key;
 class KeymasterContext;
-class OperationFactory;
 template <typename BlobType> struct TKeymasterBlob;
 typedef TKeymasterBlob<keymaster_key_blob_t> KeymasterKeyBlob;
 
